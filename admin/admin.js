@@ -1,7 +1,6 @@
 import { L } from './i18n.js';
 import { HAS_CONFIG, createFirebaseBackend, createDemoBackend, ms, ipKey } from './data.js';
 
-/* ============================== أدوات ============================== */
 const $ = (s, r = document) => r.querySelector(s);
 const $$ = (s, r = document) => Array.from(r.querySelectorAll(s));
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
