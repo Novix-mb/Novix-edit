@@ -358,7 +358,7 @@ async function installApp() {
 }
 window.addEventListener('nx-installable', () => { if ($('#tools')) head(); });
 window.addEventListener('appinstalled', () => { window.__nxIP = null; if ($('#tools')) { head(); toast(t('installed')); } });
-if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('admin-sw.js').catch(() => {});
 function head() {
   $('#ttl').textContent = t('nav_' + S.page); $('#sub').textContent = t('sub_' + S.page);
   const rng = ['today', '7d', '30d', 'all'].map(r => `<button data-act="range" data-v="${r}" class="${S.range === r ? 'on' : ''}">${t('r_' + r)}</button>`).join('');
@@ -420,9 +420,16 @@ function vStat(id) {
 }
 function vUpd(id) {
   const locked = !!(S.control['d_' + id] || {}).updLock;
+  const obDev = !!(S.control['d_' + id] || {}).offlineBlock;
   return `<div class="vupd"><button class="btn pri" data-act="updnow" data-id="${esc(id)}">${ic('refresh')}${t('a_updnow')}</button>
     <button class="btn ${locked ? 'pri' : ''}" data-act="updlock" data-id="${esc(id)}">${ic('bolt')}${locked ? t('a_updunlock') : t('a_updlock')}</button></div>
-    <small class="vhint">${locked ? t('d_upd_locked_hint') : t('d_upd_hint')}</small>`;
+    <small class="vhint">${locked ? t('d_upd_locked_hint') : t('d_upd_hint')}</small>
+    <div class="dsec" style="margin-top:16px">${t('d_offline_sec')}</div>
+    <div class="vupd" id="voffline">${offlineBtns(id, obDev)}</div>
+    <small class="vhint">${obDev ? t('d_offline_blocked_hint') : t('d_offline_hint')}</small>`;
+}
+function offlineBtns(id, ob) {
+  return `<button class="btn ${ob ? 'bad' : ''}" data-act="voffline" data-id="${esc(id)}">${ic(ob ? 'wifi-off' : 'wifi')}${ob ? t('a_offline_unblock') : t('a_offline_block')}</button><button class="btn" data-act="vofflineall">${ic('wifi-off')}${t('a_offline_all')}</button>`;
 }
 function vActs(id) {
   const v = findVisitor(id), devBan = banActive(S.control['d_' + id]), ipBan = !!(v.ip && banActive(S.control[ipKey(v.ip)]));
@@ -558,7 +565,7 @@ const feedFor = id => { const l = S.events.filter(e => e.deviceId === id).slice(
 function refreshOpen() {
   if (!S.openId || !$('#vmodal')) { S.openId = null; } else {
     const id = S.openId, set = (sel, html) => { const el = $(sel); if (el) el.innerHTML = html; };
-    set('#vwipe', wipeBox(id)); set('#vstat', vStat(id)); set('#vupd', vUpd(id)); set('#vacts', vActs(id)); set('#vpull', pullBox(id));
+    set('#vwipe', wipeBox(id)); set('#vstat', vStat(id)); set('#vupd', vUpd(id)); set('#vacts', vActs(id)); set('#vpull', pullBox(id)); set('#voffline', offlineBtns(id, !!(S.control['d_' + id] || {}).offlineBlock));
   }
   const fe = $('#vfeed'); if (fe && S.feedId) fe.innerHTML = feedFor(S.feedId);
 }
@@ -647,6 +654,27 @@ document.addEventListener('click', async e => {
     case 'vunban': await unbanVisitor(d.id); break;
     case 'vnote': { const v = $('#vnote'); try { await S.B.setVisitorNote(d.id, v.value.trim()); const x = S.visitors.find(z => z.id === d.id); if (x) x.note = v.value.trim(); toast(t('saved')); } catch (x) { toast(t('failed'), 'bad'); } break; }
     case 'pushtab': pushTab = d.k; refreshPush(d.id); break;
+    case 'voffline': {
+      const curOb = !!(S.control['d_' + d.id] || {}).offlineBlock;
+      try {
+        await S.B.setControl('d_' + d.id, { offlineBlock: !curOb });
+        S.control['d_' + d.id] = Object.assign({}, S.control['d_' + d.id], { offlineBlock: !curOb });
+        toast(t(curOb ? 'offline_allowed' : 'offline_blocked')); afterCtl();
+      } catch (e) { toast(t('failed'), 'bad'); }
+      break;
+    }
+    case 'vofflineall': {
+      const globalOb = !!(S.control.config || {}).offlineBlock;
+      modal({ title: t(globalOb ? 'offline_all_on_title' : 'offline_all_off_title'),
+        hint: t(globalOb ? 'offline_all_on_hint' : 'offline_all_off_hint'),
+        ok: t(globalOb ? 'a_offline_all_allow' : 'a_offline_all_block'), danger: !globalOb,
+        onOk: async () => {
+          await S.B.setControl('config', { offlineBlock: !globalOb });
+          S.control.config = Object.assign({}, S.control.config, { offlineBlock: !globalOb });
+          toast(t(globalOb ? 'offline_all_now_allowed' : 'offline_all_now_blocked')); afterCtl();
+        }
+      }); break;
+    }
     case 'vfetch': {
       const rid = String(Date.now());
       try {
