@@ -1,36 +1,20 @@
 {
   "id": "./",
-  "name": "NOVIX",
-  "short_name": "NOVIX",
-  "description": "Your personal study workspace",
+  "name": "NOVIX Admin",
+  "short_name": "NOVIX Admin",
+  "description": "لوحة إدارة NOVIX",
+  "lang": "ar",
+  "dir": "rtl",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",
-  "background_color": "#f1fbfa",
-  "theme_color": "#f1fbfa",
-  "categories": [
-    "education",
-    "productivity"
-  ],
+  "background_color": "#071310",
+  "theme_color": "#071310",
+  "categories": ["productivity", "utilities"],
   "icons": [
-    {
-      "src": "assets/img/novix-icon-64.png?v=6",
-      "sizes": "64x64",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "assets/img/novix-icon-256.png?v=6",
-      "sizes": "256x256",
-      "type": "image/png",
-      "purpose": "any"
-    },
-    {
-      "src": "assets/img/novix-icon-512.png?v=6",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any"
-    }
+    { "src": "icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }
