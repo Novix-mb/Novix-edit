@@ -1,4 +1,3 @@
-/* ترجمة لوحة الإدارة — عربي / English */
 export const L = {
   ar: {
     app: 'لوحة الإدارة', brand: 'NOVIX',
