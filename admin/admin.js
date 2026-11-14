@@ -60,14 +60,36 @@ const IC = {
 };
 const ic = n => `<svg class="i" viewBox="0 0 24 24">${IC[n] || ''}</svg>`;
 const devIc = d => ic(d === 'mobile' ? 'phone' : d === 'tablet' ? 'tablet' : 'monitor');
+/* صورة واسم المستخدم كما يراها هو في الموقع */
+const vis = id => S.visitors.find(v => v.id === id);
+const vName = (id, v) => ((v || vis(id) || {}).name || '').trim();
+const avt = (id, dev, size = 36) => { const v = vis(id); return v && v.photo ? `<img class="avt" style="width:${size}px;height:${size}px" src="${esc(v.photo)}" alt="">` : `<span class="ico" style="width:${size}px;height:${size}px">${devIc(dev || (v && v.device))}</span>`; };
+function wipeState(id) {
+  const c = S.control['d_' + id]; if (!c || !c.wipeId) return null;
+  const v = vis(id); return v && v.wipeAck === String(c.wipeId) ? { done: true, at: v.wipedAt } : { done: false, at: ms(c.wipeAt) };
+}
+const wipePill = id => { const w = wipeState(id); return !w ? '' : (w.done ? `<span class="pill ok">${ic('check')}${t('wipe_ok')}</span>` : `<span class="pill wr"><span class="live-dot"></span>${t('wipe_pending')}</span>`); };
+function evText(e) {
+  if (e.type === 'view') return t('ev_view') + ' ' + secLabel(e.detail);
+  if (e.type === 'open') return t('ev_open') + ' · ' + secLabel(e.detail);
+  if (e.type === 'act') return actLabel(e.detail);
+  if (e.type === 'hide') return t('ev_hide');
+  if (e.type === 'show') return t('ev_show');
+  return e.type;
+}
+const evRow = (e, who) => `<div class="evr">${avt(e.deviceId, null, 30)}<div><b>${who ? esc(vName(e.deviceId) || short(e.deviceId)) : ''}</b><span>${esc(evText(e))}</span></div><small>${ago(e.at)}</small></div>`;
+function pFeed() {
+  const list = S.events.slice(0, 120);
+  return `<div class="card"><h3>${ic('bolt')} ${t('f_title')}<small>${nf(list.length)}</small></h3>${list.length ? `<div class="evl">${list.map(e => evRow(e, true)).join('')}</div>` : emptyBox()}</div>`;
+}
 
 /* ============================== الحالة ============================== */
 const S = {
   B: null, user: null, demo: false, page: (location.hash || '#overview').slice(1) || 'overview', range: ls('nx.admin.range') || '7d',
-  sessions: [], visitors: [], control: {}, admins: [], counts: null, loaded: false, err: null,
+  sessions: [], visitors: [], events: [], control: {}, admins: [], counts: null, loaded: false, err: null,
   limit: +ls('nx.admin.limit') || 500, vq: '', vf: 'all', vs: 'last', vShow: 50, sq: '', sShow: 50
 };
-const PAGES = ['overview', 'live', 'visitors', 'sessions', 'usage', 'controls', 'team', 'settings'];
+const PAGES = ['overview', 'live', 'feed', 'visitors', 'sessions', 'usage', 'controls', 'team', 'settings'];
 if (!PAGES.includes(S.page)) S.page = 'overview';
 const hbSec = Math.max(30, Math.min(300, +C.heartbeatSec || 60));
 const onlineThr = () => Math.max(90, hbSec * 1.6) * 1000;
@@ -197,7 +219,7 @@ function pLive() {
   const a = calc(), list = Array.from(a.onlineDev.values()).sort((x, y) => y.last - x.last);
   if (!list.length) return `<div class="card"><div class="empty"><b>${t('nobody')}</b>${t('nodata_sub')}</div></div>`;
   return `<div class="grid g-3">${list.map(s => `<div class="card">
-    <div class="dv" style="margin-bottom:14px"><span class="ico">${devIc(s.device)}</span><span><b>${esc(s.ip)}</b><small>${flag(s.country)} ${esc(cname(s.country))}</small></span><span class="pill ok" style="margin-inline-start:auto"><span class="live-dot"></span>${t('st_online')}</span></div>
+    <div class="dv" style="margin-bottom:14px">${avt(s.deviceId, s.device, 40)}<span><b>${esc(vName(s.deviceId) || s.ip)}</b><small>${flag(s.country)} ${esc(cname(s.country))}</small></span><span class="pill ok" style="margin-inline-start:auto"><span class="live-dot"></span>${t('st_online')}</span></div>
     <div class="facts" style="margin-bottom:12px"><div class="fact"><small>${t('th_section')}</small><b>${esc(secLabel(s.view))}</b></div><div class="fact"><small>${t('th_dur')}</small><b>${fmtDur(s.secs)}</b></div><div class="fact"><small>${t('th_env')}</small><b>${esc(s.browser)} · ${esc(s.os)}</b></div><div class="fact"><small>${t('th_last')}</small><b>${ago(s.last)}</b></div></div>
     <div class="row-act" style="justify-content:flex-start"><button class="btn sm" data-act="vopen" data-id="${esc(s.deviceId)}">${ic('eye')}${t('a_details')}</button><button class="btn sm" data-act="vmsg" data-id="${esc(s.deviceId)}">${ic('msg')}</button><button class="btn sm bad" data-act="vban" data-id="${esc(s.deviceId)}">${ic('ban')}</button></div>
   </div>`).join('')}</div>`;
@@ -215,7 +237,7 @@ function filteredVisitors() {
     if (S.vf === 'returning' && !(v.visits > 1)) return false;
     if (S.vf === 'banned' && !isBanned(v)) return false;
     if (!q) return true;
-    return (v.ip + ' ' + v.ips.join(' ') + ' ' + v.id + ' ' + v.country + ' ' + cname(v.country) + ' ' + v.note + ' ' + v.browser + ' ' + v.os).toLowerCase().includes(q);
+    return ((v.name || '') + ' ' + v.ip + ' ' + v.ips.join(' ') + ' ' + v.id + ' ' + v.country + ' ' + cname(v.country) + ' ' + v.note + ' ' + v.browser + ' ' + v.os).toLowerCase().includes(q);
   });
   const k = { last: (x, y) => y.last - x.last, visits: (x, y) => y.visits - x.visits, time: (x, y) => y.totalSecs - x.totalSecs, first: (x, y) => x.first - y.first }[S.vs];
   return { list: list.sort(k), online: a.onlineDev };
@@ -224,7 +246,7 @@ function visitorTable() {
   const { list, online } = filteredVisitors();
   if (!list.length) return emptyBox();
   const rows = list.slice(0, S.vShow).map(v => `<tr class="click" data-act="vopen" data-id="${esc(v.id)}">
-    <td><div class="dv"><span class="ico">${devIc(v.device)}</span><span><b>${esc(short(v.id))}</b><small>${esc(devLabel(v.device))}${v.note ? ' · ' + esc(v.note.slice(0, 24)) : ''}</small></span></div></td>
+    <td><div class="dv">${avt(v.id, v.device)}<span><b>${esc(v.name || short(v.id))}</b><small>${esc(v.name ? short(v.id) + ' · ' : '')}${esc(devLabel(v.device))}${v.note ? ' · ' + esc(v.note.slice(0, 24)) : ''} ${wipePill(v.id)}</small></span></div></td>
     <td class="mono">${esc(v.ip)}${v.ips.length > 1 ? ` <small style="color:var(--muted)">+${v.ips.length - 1}</small>` : ''}</td>
     <td><span class="flag">${flag(v.country)}</span>${esc(cname(v.country))}</td>
     <td>${esc(v.browser)} · ${esc(v.os)}</td><td>${nf(v.visits)}</td><td>${fmtDur(v.totalSecs)}</td><td>${ago(v.last)}</td><td>${statusPill(v, online)}</td>
@@ -307,10 +329,10 @@ function pSettings() {
     <div style="margin-top:22px"><button class="btn" data-act="json">${ic('download')}${t('set_exp')}</button></div><div class="hint-box">${t('priv')}</div></div></div>`;
 }
 
-const PAGE_FN = { overview: pOverview, live: pLive, visitors: pVisitors, sessions: pSessions, usage: pUsage, controls: pControls, team: pTeam, settings: pSettings };
-const NAV = [['overview', 'dash'], ['live', 'pulse'], ['visitors', 'users'], ['sessions', 'layers'], ['usage', 'bolt'], ['controls', 'sliders'], ['team', 'shield'], ['settings', 'gear']];
+const PAGE_FN = { overview: pOverview, live: pLive, feed: pFeed, visitors: pVisitors, sessions: pSessions, usage: pUsage, controls: pControls, team: pTeam, settings: pSettings };
+const NAV = [['overview', 'dash'], ['live', 'pulse'], ['feed', 'bolt'], ['visitors', 'users'], ['sessions', 'layers'], ['usage', 'bolt'], ['controls', 'sliders'], ['team', 'shield'], ['settings', 'gear']];
 const RANGED = ['overview', 'usage', 'sessions'];
-const LIVE_PAGES = ['overview', 'live', 'usage'];
+const LIVE_PAGES = ['overview', 'live', 'usage', 'feed'];
 
 /* ============================== الهيكل ============================== */
 function shell() {
@@ -368,17 +390,20 @@ function openVisitor(id) {
   const ss = S.sessions.filter(s => s.deviceId === id), vs = {}, ac = {}, secs = {};
   ss.forEach(s => { for (const k in s.vsecs) secs[k] = (secs[k] || 0) + s.vsecs[k]; for (const k in s.acts) ac[k] = (ac[k] || 0) + s.acts[k]; });
   const last = ss[0], banned = isBanned(v);
-  drawer(`<div class="dh"><span class="dv"><span class="ico" style="width:46px;height:46px">${devIc(v.device)}</span></span><div style="flex:1"><h2 class="mono">${esc(short(v.id))}…</h2><small style="color:var(--muted)">${flag(v.country)} ${esc(cname(v.country))} · ${esc(v.browser)} · ${esc(v.os)}</small></div><button class="ib" data-act="close">${ic('x')}</button></div>
+  drawer(`<div class="dh"><span class="dv">${avt(id, v.device, 52)}</span><div style="flex:1"><h2 ${v.name ? '' : 'class="mono"'}>${esc(v.name || short(v.id) + '…')}</h2><small style="color:var(--muted)">${flag(v.country)} ${esc(cname(v.country))} · ${esc(v.browser)} · ${esc(v.os)}</small></div><button class="ib" data-act="close">${ic('x')}</button></div>
     <div class="facts"><div class="fact"><small>${t('th_ip')}</small><b class="mono">${esc(v.ip)}</b></div><div class="fact"><small>${t('th_status')}</small><b>${banned ? t('st_banned') : (calc().onlineDev.has(id) ? t('st_online') : t('st_offline'))}</b></div>
     <div class="fact"><small>${t('d_visits')}</small><b>${nf(v.visits)}</b></div><div class="fact"><small>${t('d_total')}</small><b>${fmtDur(v.totalSecs || ss.reduce((a, s) => a + s.secs, 0))}</b></div>
     <div class="fact"><small>${t('d_first')}</small><b>${dtm(v.first)}</b></div><div class="fact"><small>${t('d_lastseen')}</small><b>${dtm(v.last)}</b></div>
     <div class="fact"><small>${t('d_lang')}</small><b>${esc(v.lang || '—')}</b></div><div class="fact"><small>${t('d_screen')}</small><b>${esc(last ? last.scr : '—')}</b></div></div>
+    <div id="vwipe">${wipeBox(id)}</div>
+    <div class="dsec">${t('d_feed')}</div><div class="evl" id="vfeed">${feedFor(id)}</div>
     <div class="dsec">${t('d_ips')}</div><div class="chips">${(v.ips.length ? v.ips : [v.ip]).map(i => `<span class="chip mono">${esc(i)}</span>`).join('')}</div>
     ${Object.keys(secs).length ? `<div class="dsec">${t('d_sections')}</div>${bars(Object.entries(secs).sort((a, b) => b[1] - a[1]), { label: secLabel, fmt: fmtDur, pct: false, max: 6 })}` : ''}
     ${Object.keys(ac).length ? `<div class="dsec">${t('d_acts')}</div><div class="chips">${Object.entries(ac).sort((a, b) => b[1] - a[1]).map(([k, n]) => `<span class="chip">${esc(actLabel(k))} · ${n}</span>`).join('')}</div>` : ''}
     <div class="dsec">${t('d_note')}</div><textarea class="inp" id="vnote" maxlength="200" data-id="${esc(id)}">${esc(v.note)}</textarea><div style="margin-top:8px"><button class="btn sm" data-act="vnote" data-id="${esc(id)}">${ic('check')}${t('a_save')}</button></div>
     ${ss.length ? `<div class="dsec">${t('d_sessions')}</div>${ss.slice(0, 6).map(s => `<div class="sl"><span>${dtm(s.start)}</span><span>${esc(secLabel(s.view))}</span><b>${fmtDur(s.secs)}</b></div>`).join('')}` : ''}
-    <div class="dact"><button class="btn" data-act="vmsg" data-id="${esc(id)}">${ic('msg')}${t('a_message')}</button>${banned ? `<button class="btn" data-act="unban" data-key="d_${esc(id)}">${t('a_unban')}</button>` : `<button class="btn bad" data-act="vban" data-id="${esc(id)}">${ic('ban')}${t('a_ban')}</button>${v.ip !== 'unknown' ? `<button class="btn bad" data-act="vbanip" data-ip="${esc(v.ip)}">${ic('ban')}${t('a_banip')}</button>` : ''}`}<button class="btn bad" data-act="vdel" data-id="${esc(id)}">${ic('trash')}${t('a_delete')}</button></div>`);
+    <div class="dact"><button class="btn" data-act="vmsg" data-id="${esc(id)}">${ic('msg')}${t('a_message')}</button>${banned ? `<button class="btn" data-act="unban" data-key="d_${esc(id)}">${t('a_unban')}</button>` : `<button class="btn bad" data-act="vban" data-id="${esc(id)}">${ic('ban')}${t('a_ban')}</button>${v.ip !== 'unknown' ? `<button class="btn bad" data-act="vbanip" data-ip="${esc(v.ip)}">${ic('ban')}${t('a_banip')}</button>` : ''}`}<button class="btn bad" data-act="vwipe" data-id="${esc(id)}">${ic('trash')}${t('a_wipe')}</button><button class="btn" data-act="vdel" data-id="${esc(id)}">${ic('x')}${t('a_delrec')}</button></div>`);
+  S.openId = id;
 }
 function openSession(id) {
   const s = S.sessions.find(x => x.id === id); if (!s) return;
@@ -400,6 +425,20 @@ function askBanIp(ip) { modal({ title: t('b_title') + ' · ' + ip, hint: t('b_hi
 function askMsg(id) {
   modal({ title: t('m_title'), hint: t('m_hint'), body: `<div class="fld"><label>${t('m_text')}</label><textarea class="inp" name="text" maxlength="300" required></textarea></div>`, ok: t('a_confirm'),
     onOk: async fd => { await S.B.setControl('d_' + id, { message: String(fd.get('text')), msgId: String(Date.now()), msgAt: S.B.stamp() }); toast(t('done')); } });
+}
+function wipeBox(id) {
+  const w = wipeState(id); if (!w) return '';
+  return `<div class="hint-box" style="margin:14px 0">${w.done ? ic('check') + ' ' + t('wipe_done_at', { d: dtm(w.at) }) : ic('alert') + ' ' + t('wipe_wait')}</div>`;
+}
+const feedFor = id => { const l = S.events.filter(e => e.deviceId === id).slice(0, 25); return l.length ? l.map(e => evRow(e, false)).join('') : `<small style="color:var(--muted)">${t('f_none')}</small>`; };
+function refreshOpen() {
+  if (!S.openId || !$('.drawer')) { S.openId = null; return; }
+  const a = $('#vwipe'), b = $('#vfeed'); if (a) a.innerHTML = wipeBox(S.openId); if (b) b.innerHTML = feedFor(S.openId);
+}
+function askWipe(id) {
+  const v = vis(id), nm = (v && v.name) || short(id);
+  modal({ title: t('wipe_title') + ' · ' + nm, hint: t('wipe_hint'), ok: t('a_wipe'), danger: true,
+    onOk: async () => { await S.B.wipeUser(id, S.user.email || ''); toast(t('wipe_sent')); setTimeout(() => openVisitor(id), 0); } });
 }
 function askDel(id) {
   modal({ title: t('a_delete'), hint: t('sure'), ok: t('a_delete'), danger: true, onOk: async () => { const n = await S.B.deleteVisitor(id); S.visitors = S.visitors.filter(v => v.id !== id); S.sessions = S.sessions.filter(s => s.deviceId !== id); toast(t('done') + ' · ' + nf(n)); renderPage(true); } });
@@ -436,6 +475,7 @@ document.addEventListener('click', async e => {
     case 'vban': askBan(d.id); break;
     case 'vbanip': askBanIp(d.ip); break;
     case 'vdel': askDel(d.id); break;
+    case 'vwipe': askWipe(d.id); break;
     case 'unban': await unban(d.key); break;
     case 'vnote': { const v = $('#vnote'); try { await S.B.setVisitorNote(d.id, v.value.trim()); const x = S.visitors.find(z => z.id === d.id); if (x) x.note = v.value.trim(); toast(t('saved')); } catch (x) { toast(t('failed'), 'bad'); } break; }
     case 'morev': S.vShow += 50; renderTbl(); break;
@@ -505,12 +545,19 @@ async function loadVisitors() {
 async function startApp() {
   applyLang(); shell();
   watch();
-  S.B.watchControl(c => { S.control = c; if (S.page === 'controls' && !document.activeElement.closest('#page')) renderPage(true); else if (S.page === 'visitors') renderTbl(); }, e => console.error(e));
+  S.B.watchControl(c => { S.control = c; refreshOpen(); if (S.page === 'controls' && !document.activeElement.closest('#page')) renderPage(true); else if (S.page === 'visitors') renderTbl(); }, e => console.error(e));
   S.B.watchAdmins(a => { S.admins = a.sort((x, y) => x.at - y.at); if (S.page === 'team' && !document.activeElement.closest('#page')) renderPage(true); }, e => console.error(e));
-  await loadVisitors();
+  S.B.watchVisitors(1000, list => {
+    const prev = new Map(S.visitors.map(v => [v.id, v.wipeAck]));
+    if (S.vLoaded) list.forEach(v => { const c = S.control['d_' + v.id]; if (v.wipeAck && v.wipeAck !== prev.get(v.id) && c && String(c.wipeId) === v.wipeAck) toast(t('wipe_done', { n: vName(v.id, v) || short(v.id) })); });
+    S.visitors = list; S.vLoaded = true; showErr(''); refreshOpen();
+    if (S.page === 'visitors') renderTbl(); else if (LIVE_PAGES.includes(S.page)) renderPage(true);
+  }, err => { console.error(err); showErr(t('conn_err')); });
+  S.B.watchEvents(300, list => { S.events = list; refreshOpen(); if (S.page === 'feed') renderPage(true); }, err => console.error(err));
+  S.B.counts().then(c => { S.counts = c; }).catch(() => {});
   clearInterval(liveTimer); clearInterval(visTimer);
   liveTimer = setInterval(() => { if (!document.hidden && LIVE_PAGES.includes(S.page)) renderPage(true); }, 20000);
-  visTimer = setInterval(() => { if (!document.hidden) loadVisitors(); }, 120000);
+  visTimer = setInterval(() => { if (!document.hidden) S.B.counts().then(c => { S.counts = c; }).catch(() => {}); }, 120000);
 }
 
 /* ---------- شاشات الدخول ---------- */
