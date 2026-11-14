@@ -28,6 +28,8 @@ const ALL_FILES = [
 "./assets/img/novix-tab-64.png",
 "./assets/img/welcome-bg.webp",
 "./assets/js/boot.js",
+"./assets/js/nx-config.js",
+"./assets/js/nx-track.js",
 "./assets/js/gn-host.js",
 "./assets/js/gn-stickers.js",
 "./assets/js/gn.js",
@@ -82,6 +84,7 @@ self.addEventListener('fetch', event => {
     return;
   }
   if (url.origin !== self.location.origin) return;
+  if (url.pathname.indexOf('/admin/') !== -1) return; // لوحة الإدارة خارج نطاق الكاش دائماً
   if (url.pathname.endsWith('/version.json')) return;
 
   if (req.headers.has('range')) {
