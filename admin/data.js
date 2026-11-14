@@ -19,7 +19,8 @@ const normVisitor = (id, d) => ({
   id, ip: d.lastIp || 'unknown', ips: d.ips || [], country: d.country || '', device: d.device || 'desktop', browser: d.browser || '',
   os: d.os || '', lang: d.lang || '', visits: d.visits || 0, totalSecs: d.totalSecs || 0,
   first: ms(d.firstSeen), last: ms(d.lastSeen), note: d.note || '',
-  name: d.name || '', photo: d.photo || '', wipeAck: d.wipeAck ? String(d.wipeAck) : '', wipedAt: ms(d.wipedAt)
+  name: d.name || '', photo: d.photo || '', wipeAck: d.wipeAck ? String(d.wipeAck) : '', wipedAt: ms(d.wipedAt),
+  pulled: d.pulled || null, pullId: d.pullId ? String(d.pullId) : '', pulledAt: ms(d.pulledAt)
 });
 const normEvent = (id, d) => ({ id, deviceId: d.deviceId || '', sid: d.sid || '', type: d.type || '', detail: d.detail || '', at: ms(d.at) || d.cat || 0 });
 export const ipKey = ip => 'i_' + String(ip).replace(/[^a-zA-Z0-9]/g, '_');
