@@ -1,4 +1,3 @@
-
 import { L } from './i18n.js';
 import { HAS_CONFIG, createFirebaseBackend, createDemoBackend, ms, ipKey } from './data.js';
 
@@ -397,6 +396,8 @@ function openVisitor(id) {
     <div class="fact"><small>${t('d_first')}</small><b>${dtm(v.first)}</b></div><div class="fact"><small>${t('d_lastseen')}</small><b>${dtm(v.last)}</b></div>
     <div class="fact"><small>${t('d_lang')}</small><b>${esc(v.lang || '—')}</b></div><div class="fact"><small>${t('d_screen')}</small><b>${esc(last ? last.scr : '—')}</b></div></div>
     <div id="vwipe">${wipeBox(id)}</div>
+    <div class="dsec">${t('d_push')} <button class="btn sm ghost" style="margin-inline-start:8px" data-act="vfetch" data-id="${esc(id)}">${ic('refresh')}${t('d_fetch')}</button></div>
+    ${pushBox(id)}
     <div class="dsec">${t('d_feed')}</div><div class="evl" id="vfeed">${feedFor(id)}</div>
     <div class="dsec">${t('d_ips')}</div><div class="chips">${(v.ips.length ? v.ips : [v.ip]).map(i => `<span class="chip mono">${esc(i)}</span>`).join('')}</div>
     ${Object.keys(secs).length ? `<div class="dsec">${t('d_sections')}</div>${bars(Object.entries(secs).sort((a, b) => b[1] - a[1]), { label: secLabel, fmt: fmtDur, pct: false, max: 6 })}` : ''}
@@ -426,6 +427,30 @@ function askBanIp(ip) { modal({ title: t('b_title') + ' · ' + ip, hint: t('b_hi
 function askMsg(id) {
   modal({ title: t('m_title'), hint: t('m_hint'), body: `<div class="fld"><label>${t('m_text')}</label><textarea class="inp" name="text" maxlength="300" required></textarea></div>`, ok: t('a_confirm'),
     onOk: async fd => { await S.B.setControl('d_' + id, { message: String(fd.get('text')), msgId: String(Date.now()), msgAt: S.B.stamp() }); toast(t('done')); } });
+}
+/* ====== إرسال مهمة/ملاحظة/جدول إلى جهاز الزائر ====== */
+let pushTab = 'task';
+function pushBox(id) {
+  const days = [t('wd_sun'), t('wd_mon'), t('wd_tue'), t('wd_wed'), t('wd_thu'), t('wd_fri'), t('wd_sat')];
+  const tabs = ['task', 'note', 'sched'].map(k => `<button type="button" class="btn sm ${pushTab === k ? 'pri' : 'ghost'}" data-act="pushtab" data-k="${k}" data-id="${esc(id)}">${t('push_' + (k === 'sched' ? 'sched' : k))}</button>`).join(' ');
+  let body = '';
+  if (pushTab === 'task') body = `<input class="inp" name="text" maxlength="160" placeholder="${t('push_task_ph')}" required>
+    <select class="inp" name="diff" style="margin-top:8px"><option value="Low">${t('push_diff_low')}</option><option value="Medium" selected>${t('push_diff_med')}</option><option value="High">${t('push_diff_high')}</option></select>`;
+  else if (pushTab === 'note') body = `<input class="inp" name="title" maxlength="80" placeholder="${t('push_note_title')}">
+    <textarea class="inp" name="body" maxlength="2000" style="margin-top:8px" placeholder="${t('push_note_body')}" required></textarea>`;
+  else body = `<input class="inp" name="text" maxlength="80" placeholder="${t('push_sched_text')}" required>
+    <div class="grid g-2" style="margin-top:8px"><select class="inp" name="day">${days.map((d, i) => `<option value="${i}">${d}</option>`).join('')}</select><input class="inp" type="time" name="time"></div>`;
+  return `<form class="fld" id="pushF" data-id="${esc(id)}"><div class="row-act" style="justify-content:flex-start;margin-bottom:8px">${tabs}</div>${body}
+    <button class="btn sm pri" type="submit" style="margin-top:10px">${ic('check')}${t('push_send')}</button></form>`;
+}
+function refreshPush(id) { const el2 = $('#pushF'); if (el2) el2.outerHTML = pushBox(id); }
+async function sendPush(id, fd) {
+  const type = pushTab === 'sched' ? 'schedule' : pushTab;
+  const payload = type === 'task' ? { text: String(fd.get('text') || '').trim(), diff: fd.get('diff') }
+    : type === 'note' ? { title: String(fd.get('title') || '').trim(), body: String(fd.get('body') || '').trim() }
+    : { text: String(fd.get('text') || '').trim(), day: +fd.get('day') || 0, time: fd.get('time') || '' };
+  await S.B.setControl('d_' + id, { assign: { id: String(Date.now()), type, payload, by: S.user.email || '' } });
+  toast(t('push_sent'));
 }
 function wipeBox(id) {
   const w = wipeState(id); if (!w) return '';
@@ -479,6 +504,8 @@ document.addEventListener('click', async e => {
     case 'vwipe': askWipe(d.id); break;
     case 'unban': await unban(d.key); break;
     case 'vnote': { const v = $('#vnote'); try { await S.B.setVisitorNote(d.id, v.value.trim()); const x = S.visitors.find(z => z.id === d.id); if (x) x.note = v.value.trim(); toast(t('saved')); } catch (x) { toast(t('failed'), 'bad'); } break; }
+    case 'pushtab': pushTab = d.k; refreshPush(d.id); break;
+    case 'vfetch': toast(t('d_fetch_ok')); break;
     case 'morev': S.vShow += 50; renderTbl(); break;
     case 'mores': S.sShow += 50; renderTbl(); break;
     case 'csv': exportCsv(); break;
@@ -502,6 +529,11 @@ document.addEventListener('change', async e => {
   }
 });
 document.addEventListener('submit', async e => {
+  if (e.target.id === 'pushF') {
+    e.preventDefault(); const f = e.target, id = f.dataset.id;
+    try { await sendPush(id, new FormData(f)); f.reset(); } catch (x) { console.error(x); toast(t('failed'), 'bad'); }
+    return;
+  }
   const f = e.target.closest('[data-form]'); if (!f) return; e.preventDefault();
   const fd = new FormData(f), k = f.dataset.form;
   try {
