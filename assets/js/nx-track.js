@@ -201,19 +201,14 @@
 
   function active(o) { return !!(o && o.banned && (!o.until || new Date(o.until).getTime() > Date.now())); }
 
-  function applyControls(res) {
-    var cfg = {}, dev = null, ipb = null;
-    (res || []).forEach(function (r) {
-      if (!r.found) return;
-      var n = r.found.name.split('/').pop(), o = dec(r.found.fields || {});
-      if (n === 'config') cfg = o; else if (n === 'd_' + did) dev = o; else ipb = o;
-    });
-    if (cfg.track === false) { stopped = true; }
+  /* حالة الأوامر الحالية (تُحدَّث لحظياً من Firestore أو بالاستعلام الدوري) */
+  var ctl = { cfg: {}, dev: null, ipb: null }, started = false, ready = false, liveOK = false;
+
+  function applyState() {
+    var cfg = ctl.cfg || {}, dev = ctl.dev, ipb = ctl.ipb;
     var ban = active(dev) ? dev : (active(ipb) ? ipb : null);
-    if (ban) {
-      overlay('nx-ban', T.banned[0], ban.reason || T.banned[1], false); stopped = true;
-      return;
-    }
+    stopped = !!(cfg.track === false || ban);
+    if (ban) { overlay('nx-ban', T.banned[0], ban.reason || T.banned[1], false); return; }
     clearOverlay('nx-ban');
     if (cfg.maint) overlay('nx-maint', T.maint[0], cfg.maintMsg || T.maint[1], false); else clearOverlay('nx-maint');
     var bar = document.getElementById('nx-ann');
@@ -221,7 +216,7 @@
       ensureStyle();
       if (!bar) {
         bar = el('div', 'nxbar'); bar.id = 'nx-ann'; bar.appendChild(el('span'));
-        var x = el('button', '', '×'); x.onclick = function () { ls('nx.ann', cfg.annId || cfg.annText); bar.remove(); }; bar.appendChild(x); document.body.appendChild(bar);
+        var x = el('button', '', '\u00d7'); x.onclick = function () { ls('nx.ann', cfg.annId || cfg.annText); bar.remove(); }; bar.appendChild(x); document.body.appendChild(bar);
       }
       if (ls('nx.ann') === (cfg.annId || cfg.annText)) bar.remove();
       else { bar.className = 'nxbar ' + (cfg.annKind === 'warn' ? 'warn' : cfg.annKind === 'bad' ? 'bad' : ''); bar.firstChild.textContent = cfg.annText; }
@@ -229,6 +224,18 @@
     if (dev && dev.message && dev.msgId && ls('nx.msg') !== dev.msgId) {
       ls('nx.msg', dev.msgId); overlay('nx-msg', T.msg, dev.message, true);
     }
+    if (ready && !stopped && !started) start();
+  }
+
+  function applyControls(res) {
+    var cfg = {}, dev = null, ipb = null;
+    (res || []).forEach(function (r) {
+      if (!r.found) return;
+      var n = r.found.name.split('/').pop(), o = dec(r.found.fields || {});
+      if (n === 'config') cfg = o; else if (n === 'd_' + did) dev = o; else ipb = o;
+    });
+    ctl = { cfg: cfg, dev: dev, ipb: ipb };
+    applyState();
   }
 
   function ipKey(ip) { return 'i_' + String(ip).replace(/[^a-zA-Z0-9]/g, '_'); }
@@ -238,8 +245,35 @@
     return post(':batchGet', { documents: docs }).then(applyControls).catch(function () {});
   }
 
+  /* ---------- بث مباشر: الأوامر تصل في لحظتها بلا إعادة تحميل ---------- */
+  var dimport = null;
+  try { dimport = new Function('u', 'return import(u)'); } catch (e) {}
+  function plain(d) {
+    var o = {};
+    for (var k in d) { var v = d[k]; o[k] = (v && typeof v.toMillis === 'function') ? v.toMillis() : v; }
+    return o;
+  }
+  function goLive() {
+    if (!dimport || liveOK) return;
+    var base = 'https://www.gstatic.com/firebasejs/10.14.1/';
+    Promise.all([dimport(base + 'firebase-app.js'), dimport(base + 'firebase-firestore.js')]).then(function (m) {
+      var app = m[0].initializeApp({ apiKey: C.apiKey, projectId: C.projectId, appId: C.appId || undefined }, 'nx-track');
+      var db = m[1].getFirestore(app);
+      function listen(id, slot) {
+        m[1].onSnapshot(m[1].doc(db, 'control', id), function (snap) {
+          ctl[slot] = snap.exists() ? plain(snap.data()) : (slot === 'cfg' ? {} : null);
+          applyState();
+        }, function () { liveOK = false; });
+      }
+      liveOK = true;
+      listen('config', 'cfg'); listen('d_' + did, 'dev');
+      if (net.ip !== 'unknown') listen(ipKey(net.ip), 'ipb');
+    }).catch(function () { liveOK = false; });
+  }
+
   /* ---------- التشغيل ---------- */
   function start() {
+    if (started) return; started = true;
     tick();
     flush(false);
     setInterval(tick, 1000);
@@ -247,14 +281,18 @@
       if (stopped) return;
       beats++;
       if (!document.hidden) flush(false);
-      if (beats % ctlEvery === 0) loadControls();
+      if (!liveOK && beats % ctlEvery === 0) loadControls();   // احتياطي فقط إن تعذّر البث المباشر
     }, HB);
     document.addEventListener('visibilitychange', function () { if (document.hidden) flush(true); });
     addEventListener('pagehide', function () { flush(true); });
   }
 
   function boot() {
-    getIP().then(function (n) { net = n; return loadControls(); }).then(function () { if (!stopped) start(); });
+    getIP().then(function (n) { net = n; return loadControls(); }).then(function () {
+      ready = true;
+      if (!stopped) start();
+      if (window.requestIdleCallback) requestIdleCallback(goLive, { timeout: 2500 }); else setTimeout(goLive, 1500);
+    });
   }
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
 })();
