@@ -2,6 +2,10 @@
    NOVIX Tracker — خفيف (بدون مكتبات) يرسل إحصاءات الزيارة إلى Firestore
    - يسجّل: الجهاز، IP، الدولة، مدة الفتح الفعلية، الأقسام والأدوات المستخدمة
    - ينفّذ أوامر لوحة الإدارة: حظر، رسالة لزائر، وضع الصيانة، إعلان عام
+   - بث مباشر: كل قسم يفتحه المستخدم وكل إجراء يقوم به يصل للإدارة فوراً (بلا إعادة تحميل)
+   - يرسل اسم المستخدم وصورته المصغّرة إلى الإدارة فور تغييرهما
+   - مسح عن بُعد: أمر «مسح بيانات المستخدم» من الإدارة يمسح كل بياناته على جهازه
+     (كتبه، مهامه، ملاحظاته، اسمه، صورته…) ويعيده كأنه دخل لأول مرة، ثم يرسل تأكيداً للإدارة
    - لا يعمل إذا كان المتصفح مسجّلاً دخول الأدمن (حتى لا تُحسب زياراتك)
    ============================================================ */
 (function () {
@@ -20,6 +24,16 @@
   var DOC = 'projects/' + C.projectId + '/databases/(default)/documents';
   var KEY = '?key=' + encodeURIComponent(C.apiKey);
   var HB = Math.max(30, Math.min(300, +C.heartbeatSec || 60)) * 1000;
+
+  /* ---------- خطّاف التخزين: لاكتشاف تغيّر الاسم/الصورة، ولمنع إعادة كتابة البيانات أثناء المسح ---------- */
+  var PROFILE_KEY = 'novix.site.v1', blockW = false, profTimer = null;
+  var _set = Storage.prototype.setItem, _rm = Storage.prototype.removeItem;
+  Storage.prototype.setItem = function (k, v) {
+    if (blockW && !/^nx\./.test(String(k))) return;
+    var r = _set.apply(this, arguments);
+    if (k === PROFILE_KEY && this === window.localStorage) profSoon();
+    return r;
+  };
 
   /* ---------- أدوات صغيرة ---------- */
   function uid(n) {
@@ -103,20 +117,24 @@
   var created = false, beats = 0, stopped = false, ctlEvery = Math.max(1, Math.round(300000 / HB));
   var startedAt = new Date();
 
-  function act(name) { bump(pend.acts, name, 1); }
+  function act(name) { bump(pend.acts, name, 1); ev('act', name); }
   window.NXTrack = { act: act };
 
   /* ---------- جمع الاستخدام ---------- */
   function tick() {
     var now = Date.now(), dt = Math.min(5, Math.round((now - lastTick) / 1000)); lastTick = now;
     var v = (document.body && document.body.dataset.view) || 'home';
-    if (v !== cur) { cur = v; bump(pend.views, v, 1); }
+    if (v !== cur) {
+      var first = cur === null; cur = v; bump(pend.views, v, 1);
+      ev(first ? 'open' : 'view', v);
+      if (!first && started) setTimeout(function () { flush(false); }, 500);   // القسم يصل للإدارة فوراً
+    }
     if (!document.hidden && dt > 0) { secs += dt; pendSecs += dt; vPendSecs += dt; bump(pend.vsecs, v, dt); }
     var r = document.getElementById('novix-pdf-reader'), open = !!(r && r.classList.contains('open'));
     if (open && !pdfOpen) act('pdf_read'); pdfOpen = open;
   }
 
-  var CLICKS = { '#fxGo': 'timer_start', '#fxMb': 'sound_menu', '#fxBgPickerBtn': 'bg_menu', '#themeSw': 'theme_toggle', '#nr-export': 'export', '#fxFs': 'fullscreen' };
+  var CLICKS = { '#ttNew': 'plan_add', '#nr-note': 'note_open', '#fxGo': 'timer_start', '#fxMb': 'sound_menu', '#fxBgPickerBtn': 'bg_menu', '#themeSw': 'theme_toggle', '#nr-export': 'export', '#fxFs': 'fullscreen' };
   var SUBMITS = { '#addF': 'task_add', '#bkF': 'book_add' };
   document.addEventListener('click', function (e) {
     for (var s in CLICKS) if (e.target.closest && e.target.closest(s)) { act(CLICKS[s]); break; }
@@ -125,8 +143,98 @@
     for (var s in SUBMITS) if (e.target.matches && e.target.matches(s)) { act(SUBMITS[s]); break; }
   }, true);
   document.addEventListener('change', function (e) {
-    if (e.target && e.target.id === 'langSel') act('lang_change');
+    if (!e.target) return;
+    if (e.target.id === 'langSel') act('lang_change');
+    else if (e.target.id === 'avFile') act('photo_change');
+    else if (e.target.id === 'fxFile') act('file_upload');
   }, true);
+
+  /* ---------- سجل الأحداث المباشر ---------- */
+  var evq = [], evT = null, evCount = 0, evWin = Date.now();
+  function ev(type, detail) {
+    if (stopped || wiping) return;
+    var now = Date.now();
+    if (now - evWin > 60000) { evWin = now; evCount = 0; }
+    if (++evCount > 60) return;                       // حماية من الإغراق
+    evq.push({ type: type, detail: String(detail || '').slice(0, 40), t: now });
+    if (!evT) evT = setTimeout(flushEv, 700);
+  }
+  function flushEv(final) {
+    clearTimeout(evT); evT = null;
+    if (!evq.length || stopped || wiping) return;
+    var batch = evq.splice(0, 20);
+    var writes = batch.map(function (e) {
+      return {
+        update: { name: DOC + '/events/' + uid(8), fields: fields({ deviceId: did, sid: sid, type: e.type, detail: e.detail, cat: e.t }) },
+        updateTransforms: [{ fieldPath: 'at', setToServerValue: 'REQUEST_TIME' }]
+      };
+    });
+    post(':commit', { writes: writes }, final === true).catch(function () { evq = batch.concat(evq).slice(0, 60); });
+    if (evq.length) evT = setTimeout(flushEv, 700);
+  }
+
+  /* ---------- الاسم والصورة ---------- */
+  var lastProf = '';
+  function readProfile() {
+    try { var o = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null') || {}; return { name: String(o.name || '').trim().slice(0, 24), avatar: typeof o.avatar === 'string' ? o.avatar : '' }; }
+    catch (e) { return { name: '', avatar: '' }; }
+  }
+  function thumb(src) {
+    return new Promise(function (res) {
+      if (!src) return res('');
+      var im = new Image();
+      im.onload = function () {
+        try {
+          var N = 72, c = document.createElement('canvas'); c.width = c.height = N;
+          var m = Math.min(im.naturalWidth, im.naturalHeight);
+          c.getContext('2d').drawImage(im, (im.naturalWidth - m) / 2, (im.naturalHeight - m) / 2, m, m, 0, 0, N, N);
+          res(c.toDataURL('image/jpeg', 0.65));
+        } catch (e) { res(''); }
+      };
+      im.onerror = function () { res(''); };
+      im.src = src;
+    });
+  }
+  function profSoon() { if (blockW) return; clearTimeout(profTimer); profTimer = setTimeout(sendProfile, 1200); }
+  function sendProfile() {
+    if (wiping || blockW) return;
+    var p = readProfile(), sig = p.name + '|' + p.avatar.length + '|' + p.avatar.slice(-24);
+    if (sig === lastProf) return;
+    if (lastProf === '' && !p.name && !p.avatar) { lastProf = sig; return; }   // لا جديد يُرسل
+    lastProf = sig;
+    thumb(p.avatar).then(function (ph) {
+      if (wiping || blockW) return;
+      post(':commit', { writes: [{
+        update: { name: DOC + '/visitors/' + did, fields: fields({ name: p.name, photo: ph }) },
+        updateMask: { fieldPaths: ['name', 'photo'] },
+        updateTransforms: [{ fieldPath: 'profileAt', setToServerValue: 'REQUEST_TIME' }]
+      }] }).catch(function () { lastProf = ''; });
+    });
+  }
+
+  /* ---------- مسح بيانات المستخدم عن بُعد ---------- */
+  var wiping = false;
+  var KEEP_KEYS = { 'nx.did': 1, 'nx.reg': 1 };           // هوية الجهاز تبقى ليظل في قائمة الإدارة
+  function doWipe(id) {
+    if (wiping) return; wiping = true; blockW = true;
+    try {
+      var ks = []; for (var i = 0; i < localStorage.length; i++) ks.push(localStorage.key(i));
+      ks.forEach(function (k) { if (!KEEP_KEYS[k]) _rm.call(localStorage, k); });
+    } catch (e) {}
+    try { sessionStorage.clear(); } catch (e) {}
+    try { _set.call(localStorage, 'nx.wiped', id); _set.call(localStorage, 'nx.wipe2', id); } catch (e) {}
+    try { ['novix-lib', 'novix-sw', 'novix-focus', 'novix-gn'].forEach(function (n) { indexedDB.deleteDatabase(n); }); } catch (e) {}
+    overlay('nx-wipe', T.wipe[0], T.wipe[1], false);
+    setTimeout(function () { location.reload(); }, 1400);   // boot.js يكمل حذف قواعد البيانات قبل أن يفتحها الموقع
+  }
+  function ackWipe() {
+    var a = ls('nx.wipeack'); if (!a) return;
+    post(':commit', { writes: [{
+      update: { name: DOC + '/visitors/' + did, fields: fields({ wipeAck: a, name: '', photo: '' }) },
+      updateMask: { fieldPaths: ['wipeAck', 'name', 'photo'] },
+      updateTransforms: [{ fieldPath: 'wipedAt', setToServerValue: 'REQUEST_TIME' }]
+    }] }).then(function () { try { _rm.call(localStorage, 'nx.wipeack'); } catch (e) {} lastProf = ''; }).catch(function () {});
+  }
 
   /* ---------- الإرسال ---------- */
   function visitorWrite(isStart, final) {
@@ -140,8 +248,11 @@
     return { update: { name: DOC + '/visitors/' + did, fields: fields(f) }, updateMask: { fieldPaths: mask }, updateTransforms: tr };
   }
 
+  var busy = false, again = false;
   function flush(final) {
-    if (stopped) return Promise.resolve();
+    if (stopped || wiping) return Promise.resolve();
+    if (busy && (!final || !created)) { again = true; return Promise.resolve(); }
+    busy = true;
     tick();
     var snap = { views: pend.views, vsecs: pend.vsecs, acts: pend.acts };
     var snapSecs = vPendSecs;
@@ -172,7 +283,7 @@
       // أعد العدادات لتُرسل لاحقاً
       ['views', 'vsecs', 'acts'].forEach(function (m) { for (var k in snap[m]) bump(pend[m], k, snap[m][k]); });
       if (withVisitor) vPendSecs += snapSecs;
-    });
+    }).then(function () { busy = false; if (again) { again = false; setTimeout(function () { flush(false); }, 300); } });
   }
 
   /* ---------- أوامر الأدمن ---------- */
@@ -181,7 +292,8 @@
     banned: AR ? ['تم تقييد وصولك', 'لا يمكنك استخدام الموقع حالياً.'] : ['Access restricted', 'You cannot use this site right now.'],
     maint: AR ? ['الموقع تحت الصيانة', 'نعمل على تحسينات، سنعود قريباً.'] : ['Under maintenance', 'We are making improvements. Back soon.'],
     msg: AR ? 'رسالة من الإدارة' : 'Message from the team',
-    ok: AR ? 'حسناً' : 'OK'
+    ok: AR ? 'حسناً' : 'OK',
+    wipe: AR ? ['إعادة ضبط بياناتك', 'قامت الإدارة بمسح بياناتك، وسيُعاد تحميل الموقع الآن.'] : ['Resetting your data', 'The team cleared your data. The site will reload now.']
   };
   var CSSTXT = '.nxo{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 30% 20%,#12332f,#0a1412 60%);color:#e8f4f1;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;text-align:center}' +
     '.nxo div{max-width:420px}.nxo h2{margin:0 0 10px;font-size:26px;color:#5fe0c8}.nxo p{margin:0;line-height:1.8;color:#b9d0ca;white-space:pre-wrap}' +
@@ -207,6 +319,7 @@
   function applyState() {
     var cfg = ctl.cfg || {}, dev = ctl.dev, ipb = ctl.ipb;
     var ban = active(dev) ? dev : (active(ipb) ? ipb : null);
+    if (dev && dev.wipeId && String(dev.wipeId) !== ls('nx.wiped')) { doWipe(String(dev.wipeId)); return; }
     stopped = !!(cfg.track === false || ban);
     if (ban) { overlay('nx-ban', T.banned[0], ban.reason || T.banned[1], false); return; }
     clearOverlay('nx-ban');
@@ -276,18 +389,21 @@
     if (started) return; started = true;
     tick();
     flush(false);
+    sendProfile();
     setInterval(tick, 1000);
     setInterval(function () {
       if (stopped) return;
       beats++;
       if (!document.hidden) flush(false);
+      flushEv(false); ackWipe();
       if (!liveOK && beats % ctlEvery === 0) loadControls();   // احتياطي فقط إن تعذّر البث المباشر
     }, HB);
-    document.addEventListener('visibilitychange', function () { if (document.hidden) flush(true); });
-    addEventListener('pagehide', function () { flush(true); });
+    document.addEventListener('visibilitychange', function () { ev(document.hidden ? 'hide' : 'show', ''); if (document.hidden) { flush(true); flushEv(true); } });
+    addEventListener('pagehide', function () { flush(true); flushEv(true); });
   }
 
   function boot() {
+    ackWipe();
     getIP().then(function (n) { net = n; return loadControls(); }).then(function () {
       ready = true;
       if (!stopped) start();
