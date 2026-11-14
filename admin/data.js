@@ -111,16 +111,20 @@ export async function createFirebaseBackend() {
     },
     /* مسح الأجهزة التي آخر ظهور لها أقدم من ms (أو الكل إن كان ms = 0) مع جلساتها وأحداثها، مع استثناء المعرّفات في skip */
     async cleanVisitors(ms, skip) {
+      // يحتاج استعلام الصفحات (startAfter) إلى orderBy صريح وإلا يرفضه Firestore بخطأ صامت تلتقطه catch أعلى — وهذا كان سبب تعطّل الزر
       const sk = new Set(skip || []), ids = [], cut = ms > 0 ? F.Timestamp.fromMillis(Date.now() - ms) : null; let last = null;
-      for (let i = 0; i < 60; i++) {
-        const qs = [cut ? F.where('lastSeen', '<', cut) : null, last ? F.startAfter(last) : null, F.limit(200)].filter(Boolean);
+      for (let i = 0; i < 400; i++) {
+        const qs = [cut ? F.where('lastSeen', '<', cut) : null, F.orderBy('lastSeen'), last ? F.startAfter(last) : null, F.limit(200)].filter(Boolean);
         const s = await F.getDocs(F.query(col('visitors'), ...qs));
         if (s.empty) break;
         last = s.docs[s.docs.length - 1]; s.docs.forEach(d => { if (!sk.has(d.id)) ids.push(d.id); });
         if (s.size < 200) break;
       }
-      for (let i = 0; i < ids.length; i += 5) await Promise.all(ids.slice(i, i + 5).map(id => this.deleteVisitor(id)));
-      return ids;
+      const done = [];
+      for (let i = 0; i < ids.length; i += 5) {
+        await Promise.all(ids.slice(i, i + 5).map(id => this.deleteVisitor(id).then(() => done.push(id)).catch(() => {})));
+      }
+      return done;
     },
     async cleanOld(days) {
       const cut = F.Timestamp.fromMillis(Date.now() - days * 864e5); let n = 0;
