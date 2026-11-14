@@ -18,8 +18,10 @@ const normSession = (id, d) => ({
 const normVisitor = (id, d) => ({
   id, ip: d.lastIp || 'unknown', ips: d.ips || [], country: d.country || '', device: d.device || 'desktop', browser: d.browser || '',
   os: d.os || '', lang: d.lang || '', visits: d.visits || 0, totalSecs: d.totalSecs || 0,
-  first: ms(d.firstSeen), last: ms(d.lastSeen), note: d.note || ''
+  first: ms(d.firstSeen), last: ms(d.lastSeen), note: d.note || '',
+  name: d.name || '', photo: d.photo || '', wipeAck: d.wipeAck ? String(d.wipeAck) : '', wipedAt: ms(d.wipedAt)
 });
+const normEvent = (id, d) => ({ id, deviceId: d.deviceId || '', sid: d.sid || '', type: d.type || '', detail: d.detail || '', at: ms(d.at) || d.cat || 0 });
 export const ipKey = ip => 'i_' + String(ip).replace(/[^a-zA-Z0-9]/g, '_');
 
 /* ======================= Firebase الحقيقي ======================= */
@@ -50,6 +52,26 @@ export async function createFirebaseBackend() {
       sub('sessions', F.query(col('sessions'), F.orderBy('lastSeen', 'desc'), F.limit(limit)),
         s => cb(s.docs.map(d => normSession(d.id, d.data()))), onErr);
     },
+    watchVisitors(limit, cb, onErr) {
+      sub('visitors', F.query(col('visitors'), F.orderBy('lastSeen', 'desc'), F.limit(limit)),
+        s => cb(s.docs.map(d => normVisitor(d.id, d.data()))), onErr);
+    },
+    watchEvents(limit, cb, onErr) {
+      sub('events', F.query(col('events'), F.orderBy('at', 'desc'), F.limit(limit)),
+        s => cb(s.docs.map(d => normEvent(d.id, d.data()))), onErr);
+    },
+    async wipeUser(id, by) {
+      // 1) أمر المسح يصل للجهاز لحظياً (أو عند فتحه الموقع إن كان مغلقاً)
+      await F.setDoc(F.doc(db, 'control', 'd_' + id), { wipeId: String(Date.now()), wipeAt: F.serverTimestamp(), wipeBy: by || '' }, { merge: true });
+      // 2) تفريغ سجل أفعاله عندي ليبدأ من الصفر (يبقى هو في قائمة الزوار)
+      let n = 0;
+      for (let i = 0; i < 20; i++) {
+        const s = await F.getDocs(F.query(col('events'), F.where('deviceId', '==', id), F.limit(400)));
+        if (s.empty) break;
+        const b = F.writeBatch(db); s.docs.forEach(d => b.delete(d.ref)); await b.commit(); n += s.size;
+      }
+      return n;
+    },
     watchControl(cb, onErr) {
       sub('control', col('control'), s => { const o = {}; s.docs.forEach(d => { o[d.id] = d.data(); }); cb(o); }, onErr);
     },
@@ -76,6 +98,11 @@ export async function createFirebaseBackend() {
         const s = await F.getDocs(F.query(col('sessions'), F.where('deviceId', '==', id), F.limit(400)));
         if (s.empty) break;
         const b = F.writeBatch(db); s.docs.forEach(d => b.delete(d.ref)); await b.commit(); n += s.size;
+      }
+      for (let i = 0; i < 20; i++) {
+        const s = await F.getDocs(F.query(col('events'), F.where('deviceId', '==', id), F.limit(400)));
+        if (s.empty) break;
+        const b = F.writeBatch(db); s.docs.forEach(d => b.delete(d.ref)); await b.commit();
       }
       await F.deleteDoc(F.doc(db, 'visitors', id));
       try { await F.deleteDoc(F.doc(db, 'control', 'd_' + id)); } catch (e) {}
@@ -169,6 +196,13 @@ export function createDemoBackend() {
     watchControl(cb) { ctlCb = cb; setTimeout(() => cb(JSON.parse(JSON.stringify(control))), 80); },
     watchAdmins(cb) { admCb = cb; setTimeout(() => cb(admins.slice()), 80); },
     loadVisitors: async () => visitors.map(v => ({ ...v })),
+    watchVisitors(limit, cb) { setTimeout(() => cb(visitors.map(v => ({ ...v }))), 100); },
+    watchEvents(limit, cb) {
+      const T = ['view', 'act', 'view', 'show'], D = ['tasks', 'timer_start', 'library', ''];
+      const mk = i => { const k = i % 4; return { id: 'e' + i, deviceId: devices[i % 9].id, sid: '', type: T[k], detail: D[k], at: Date.now() - i * 17000 }; };
+      setTimeout(() => cb(Array.from({ length: 30 }, (_, i) => mk(i))), 120);
+    },
+    async wipeUser(id) { control['d_' + id] = Object.assign(control['d_' + id] || {}, { wipeId: String(Date.now()) }); ctlCb && ctlCb(JSON.parse(JSON.stringify(control))); return 0; },
     counts: async () => ({ visitors: 1284, sessions: 6420 }),
     stamp: () => Date.now(), ts: v => v,
     async setControl(id, data) { control[id] = Object.assign(control[id] || {}, data); ctlCb && ctlCb(JSON.parse(JSON.stringify(control))); },
