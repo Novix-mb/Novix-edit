@@ -1,0 +1,26 @@
+<!doctype html>
+<html lang="ar" dir="rtl" data-theme="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex, nofollow">
+  <meta name="theme-color" content="#071310">
+  <title>NOVIX Admin</title>
+  <link rel="icon" href="../assets/img/favicon.ico">
+  <script>
+    /* تطبيق المظهر واللغة قبل الرسم لتجنب الوميض */
+    try {
+      var t = localStorage.getItem('nx.admin.theme'), l = localStorage.getItem('nx.admin.lang') || 'ar';
+      if (t) document.documentElement.dataset.theme = t;
+      document.documentElement.lang = l; document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
+    } catch (e) {}
+  </script>
+  <link rel="stylesheet" href="../assets/css/fonts.css" media="print" onload="this.media='all'">
+  <link rel="stylesheet" href="admin.css">
+  <script src="../assets/js/nx-config.js"></script>
+</head>
+<body>
+  <div id="root"><div class="gate"><div class="spin"></div></div></div>
+  <script type="module" src="admin.js"></script>
+</body>
+</html>
