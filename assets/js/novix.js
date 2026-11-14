@@ -174,7 +174,7 @@
                 'A smart whiteboard to draw, write and present: pens, highlighter, shapes, text, sticky notes, stickers, images and a laser pointer, with many pages you can save as a PDF.': 'سبورة ذكية للرسم والكتابة والعرض: أقلام وهايلايتر وأشكال ونصوص وملاحظات لاصقة وملصقات وصور ومؤشر ليزر، مع صفحات كثيرة يمكنك حفظها كملف PDF.',
                 'Draw, explain and present on a smart whiteboard.': 'ارسم واشرح وقدّم على سبورة ذكية.',
                 'Your data stays with you': 'بياناتك تبقى معك',
-                'Books, notes and settings are saved on this device only and are never uploaded. Clearing your browser data will remove them.': 'تُحفظ الكتب والملاحظات والإعدادات على هذا الجهاز فقط ولا تُرفع إلى أي مكان. مسح بيانات المتصفح سيحذفها.',
+                'Books, notes and settings are saved on this device only and are never uploaded. Clearing your browser data will remove them. The site only collects anonymous usage statistics (visit time, sections used, device type and IP address) to improve it.': 'تُحفظ الكتب والملاحظات والإعدادات على هذا الجهاز فقط ولا تُرفع إلى أي مكان. مسح بيانات المتصفح سيحذفها. يجمع الموقع فقط إحصاءات استخدام مجهولة (مدة الزيارة والأقسام المستخدمة ونوع الجهاز وعنوان IP) لتحسينه.',
                 'Designed & developed by': 'تصميم وتطوير',
                 'Reset settings': 'إعادة ضبط الإعدادات',
                 'Settings reset': 'تمت إعادة ضبط الإعدادات',
