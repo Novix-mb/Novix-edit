@@ -228,3 +228,12 @@ html[dir="rtl"] .toast { transform: translateX(50%); }
 .heat i { display: block; }
 .heat i span { position: absolute; inset: 0; display: grid; place-items: center; font-size: 10px; font-style: normal; color: var(--text); opacity: .75; }
 .pill { white-space: nowrap; }
+
+/* — الصورة والنشاط المباشر — */
+.avt { border-radius: 50%; object-fit: cover; flex: none; border: 2px solid var(--line, rgba(255,255,255,.12)); }
+.evl { display: flex; flex-direction: column; gap: 2px; }
+.evr { display: flex; align-items: center; gap: 10px; padding: 7px 4px; border-bottom: 1px solid var(--line, rgba(255,255,255,.07)); }
+.evr:last-child { border-bottom: 0; }
+.evr > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.evr b { font-size: 13px; } .evr span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.evr small { color: var(--muted); white-space: nowrap; }
