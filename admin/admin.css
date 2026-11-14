@@ -238,3 +238,22 @@ html[dir="rtl"] .toast { transform: translateX(50%); }
 .evr > div { flex: 1; min-width: 0; display: flex; flex-direction: column; }
 .evr b { font-size: 13px; } .evr span { font-size: 13px; color: var(--muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .evr small { color: var(--muted); white-space: nowrap; }
+
+/* ---------- نافذة الجهاز المنبثقة بتبويبات ---------- */
+.modal .box.vm { width: min(680px, 100%); max-height: min(88vh, 860px); padding: 0; display: flex; flex-direction: column; overflow: hidden; }
+.vm .vhead { padding: 22px 24px 0; flex: none; border-bottom: 1px solid var(--line); }
+.vm .vhead .dh { margin-bottom: 12px; }
+.vm .vbody { padding: 4px 24px 24px; overflow-y: auto; flex: 1; min-height: 0; }
+.vstat { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; min-height: 22px; }
+.vtabs { display: flex; gap: 4px; }
+.vtabs button { flex: 1; padding: 11px 8px; border: 0; border-bottom: 2px solid transparent; background: none; color: var(--muted); font: inherit; font-weight: 700; font-size: 13px; cursor: pointer; transition: .2s; }
+.vtabs button:hover { color: var(--text, inherit); }
+.vtabs button.on { color: var(--acc); border-bottom-color: var(--acc); }
+.vpane { display: none; } .vpane.on { display: block; animation: fade .2s both; }
+.vpane .dsec.first { margin-top: 16px; }
+.vupd { display: flex; gap: 8px; flex-wrap: wrap; }
+.vhint { display: block; margin-top: 10px; color: var(--muted); font-size: 12px; line-height: 1.6; }
+.shade.l2 { z-index: 75; } .modal.l2 { z-index: 76; }
+.vfeedbox { width: min(520px, 100%) !important; }
+.vm .dh .btn.sm { white-space: nowrap; }
+@media (max-width: 520px) { .vm .vhead { padding: 18px 16px 0; } .vm .vbody { padding: 4px 16px 20px; } .vm .dh .btn.sm { font-size: 0; gap: 0; padding: 8px; } .vm .dh .btn.sm svg { width: 18px; height: 18px; } }
