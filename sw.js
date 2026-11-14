@@ -1,9 +1,9 @@
-
 const CODE = 'novix-code';
 const MEDIA = 'novix-media';
 const FONTS = 'novix-fonts';
 const KEEP = [CODE, MEDIA, FONTS];
 const BUILD = '1794999001';
+let offlineBlock = false;   // يُضبط ديناميكياً من الصفحة عبر postMessage
 const ALL_FILES = [
 "./assets/css/fonts.css",
 "./assets/audio/fireplace.mp3",
@@ -73,6 +73,11 @@ self.addEventListener('activate', event => {
 
 self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
+  if (event.data && event.data.type === 'SET_OFFLINE_BLOCK') {
+    offlineBlock = !!event.data.value;
+    // أعلم كل النوافذ المفتوحة بالتغيير
+    self.clients.matchAll({ includeUncontrolled: true }).then(list => list.forEach(c => c.postMessage({ type: 'OFFLINE_BLOCK_CHANGED', value: offlineBlock })));
+  }
 });
 
 self.addEventListener('fetch', event => {
@@ -120,6 +125,7 @@ async function tellClients() {
 
 async function cacheFirst(req) {
   const cache = await caches.open(CODE);
+  if (offlineBlock) return networkFirst(req);   // في وضع «بدون إنترنت ممنوع» نتجاوز الكاش دائماً
   let hit = await cache.match(req, { ignoreSearch: true });
   if (!hit && req.mode === 'navigate') hit = await cache.match('./index.html');
   if (!hit) return networkFirst(req);
@@ -145,6 +151,7 @@ async function networkFirst(req) {
     try {
       return await net;
     } catch (e) {
+      if (offlineBlock) throw e;      // وضع «بدون إنترنت ممنوع» — لا نعود للكاش أبداً
       if (req.mode === 'navigate') {
         const home = await cache.match('./index.html');
         if (home) return home;
@@ -157,6 +164,7 @@ async function networkFirst(req) {
   try {
     return await Promise.race([net, timeout]);
   } catch (e) {
+    if (offlineBlock) throw e;        // بدون إنترنت ممنوع — لا نخدم من الكاش
     return hit;
   }
 }
