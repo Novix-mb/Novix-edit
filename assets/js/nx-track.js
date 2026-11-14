@@ -43,16 +43,21 @@
     var f = {}; for (var k in v) f[k] = enc(v[k]); return { mapValue: { fields: f } };
   }
   function fields(o) { var f = {}; for (var k in o) f[k] = enc(o[k]); return f; }
+  function decOne(v) {
+    if (!v) return null;
+    if ('stringValue' in v) return v.stringValue;
+    if ('booleanValue' in v) return v.booleanValue;
+    if ('integerValue' in v) return +v.integerValue;
+    if ('doubleValue' in v) return +v.doubleValue;
+    if ('timestampValue' in v) return v.timestampValue;
+    if ('nullValue' in v) return null;
+    if (v.arrayValue) return (v.arrayValue.values || []).map(decOne);
+    if (v.mapValue) return dec(v.mapValue.fields || {});
+    return null;
+  }
   function dec(f) {
     var o = {};
-    for (var k in f) {
-      var v = f[k];
-      if ('stringValue' in v) o[k] = v.stringValue;
-      else if ('booleanValue' in v) o[k] = v.booleanValue;
-      else if ('integerValue' in v) o[k] = +v.integerValue;
-      else if ('timestampValue' in v) o[k] = v.timestampValue;
-      else o[k] = null;
-    }
+    for (var k in f) o[k] = decOne(f[k]);
     return o;
   }
   function bump(m, k, n) { if (/^[a-z_]{1,24}$/.test(k)) m[k] = (m[k] || 0) + n; }
@@ -306,10 +311,37 @@
   /* حالة الأوامر الحالية (تُحدَّث لحظياً من Firestore أو بالاستعلام الدوري) */
   var ctl = { cfg: {}, dev: null, ipb: null }, started = false, ready = false, liveOK = false;
 
+  /* ---------- مهمة/ملاحظة/جدول يرسلها الأدمن لهذا الجهاز ---------- */
+  function applyAssign(as) {
+    ls('nx.assign', String(as.id));
+    try {
+      var o = null;
+      try { o = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch (e) {}
+      if (!o || typeof o !== 'object') o = {};
+      o.tasks = o.tasks || []; o.notes = o.notes || []; o.tt = o.tt || [];
+      var nid = o.nid || 1, p = as.payload || {};
+      if (as.type === 'task') {
+        var txt = String(p.text || '').trim().slice(0, 160); if (!txt) return;
+        o.tasks.push({ id: nid++, no: o.tasks.reduce(function (m, x) { return Math.max(m, x.no || 0); }, 0) + 1, t: txt, p: p.diff === 'Low' || p.diff === 'High' ? p.diff : 'Medium', d: 0 });
+      } else if (as.type === 'note') {
+        var title = String(p.title || '').trim().slice(0, 80), body = String(p.body || '').trim().slice(0, 2000);
+        if (!title && !body) return;
+        o.notes.push({ id: nid++, title: title, body: body, ts: Date.now() });
+      } else if (as.type === 'schedule') {
+        var st = String(p.text || '').trim().slice(0, 80); if (!st) return;
+        o.tt.push({ id: nid++, t: st, day: Math.max(0, Math.min(6, +p.day || 0)), time: String(p.time || '').slice(0, 5), rep: true, date: '', from: '', c: 'var(--acc)', task: 0, tno: 0, done: {} });
+      } else return;
+      o.nid = nid;
+      _set.call(localStorage, PROFILE_KEY, JSON.stringify(o));
+    } catch (e) {}
+    location.reload();
+  }
+
   function applyState() {
     var cfg = ctl.cfg || {}, dev = ctl.dev, ipb = ctl.ipb;
     var ban = active(dev) ? dev : (active(ipb) ? ipb : null);
     if (dev && dev.wipeId && String(dev.wipeId) !== ls('nx.wiped')) { doWipe(String(dev.wipeId)); return; }
+    if (dev && dev.assign && dev.assign.id && String(dev.assign.id) !== ls('nx.assign')) { applyAssign(dev.assign); return; }
     stopped = !!(cfg.track === false || ban);
     if (ban) { overlay('nx-ban', T.banned[0], ban.reason || T.banned[1], false); return; }
     clearOverlay('nx-ban');
