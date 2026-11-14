@@ -251,7 +251,8 @@
             Object.assign(AR, {
                 'Student': 'طالب',
                 'No tasks yet. Add your first task above.': 'لا توجد مهام بعد. أضف أول مهمة من الأعلى.',
-                'Storage is full. Recent changes may not be saved.': 'مساحة التخزين ممتلئة. قد لا تُحفظ آخر التغييرات.'
+                'Storage is full. Recent changes may not be saved.': 'مساحة التخزين ممتلئة. قد لا تُحفظ آخر التغييرات.',
+                'New item received from the team': 'وصلك عنصر جديد من فريق الموقع'
             });
             Object.assign(AR, {
                 'A new version of NOVIX is available': 'يوجد تحديث جديد لـ NOVIX',
@@ -298,6 +299,41 @@
                     }
                     return false
                 }
+            };
+            window.NXAPPLY = (type, payload) => {
+                try {
+                    payload = payload || {};
+                    if (type === 'task') {
+                        const txt = String(payload.text || '').trim().slice(0, 160);
+                        if (!txt) return;
+                        S.tasks.push({
+                            id: S.nid++,
+                            no: S.tasks.reduce((m, x) => Math.max(m, x.no || 0), 0) + 1,
+                            t: txt,
+                            p: (payload.diff === 'Low' || payload.diff === 'High') ? payload.diff : 'Medium',
+                            d: 0
+                        });
+                    } else if (type === 'note') {
+                        const title = String(payload.title || '').trim().slice(0, 80), body = String(payload.body || '').trim().slice(0, 2000);
+                        if (!title && !body) return;
+                        S.notes = S.notes || [];
+                        S.notes.push({ id: S.nid++, title, body, ts: Date.now() });
+                    } else if (type === 'schedule') {
+                        const txt = String(payload.text || '').trim().slice(0, 80);
+                        if (!txt) return;
+                        S.tt = S.tt || [];
+                        S.tt.push({
+                            id: S.nid++, t: txt, day: Math.max(0, Math.min(6, +payload.day || 0)),
+                            time: String(payload.time || '').slice(0, 5), rep: true, date: '', from: '',
+                            c: 'var(--acc)', task: 0, tno: 0, done: {}
+                        });
+                    } else return;
+                    save();
+                    try { if (typeof render === 'function') render(); } catch (e) {}
+                    try { if (typeof renderNotes === 'function') renderNotes(); } catch (e) {}
+                    try { if (typeof renderTT === 'function') renderTT(); } catch (e) {}
+                    toast(tr('New item received from the team'));
+                } catch (e) {}
             };
             const syncProfile = () => {
                 const n = (S.name || '').trim() || tr('Student');
@@ -9541,6 +9577,7 @@
         baseV = null,
         running = null,
         quiet = false,
+        locked = false,
         lastAuto = 0,
         state = 'idle',
         hadController = !!navigator.serviceWorker.controller;
@@ -9598,7 +9635,8 @@
         return ka.every(k => !(k in b) || a[k] === b[k]);
     };
 
-    const check = () => {
+    const check = (force) => {
+        if (locked && !force) return Promise.resolve('same');
         if (running) return running;
         running = (async () => {
             try {
@@ -9698,8 +9736,23 @@
     };
 
     const auto = async () => {
-        if (quiet || bar || state !== 'idle') return;
+        if (locked || quiet || bar || state !== 'idle') return;
         if (await check() === 'update') showBar();
+    };
+
+    window.NXUPD = {
+        setLock(v) {
+            locked = !!v;
+            if (locked && bar) { bar.remove(); bar = null; }
+        },
+        forceApply() {
+            quiet = false;
+            (async () => {
+                const r = await check(true);
+                if (r === 'update') apply();
+                else location.reload();
+            })();
+        }
     };
 
     document.addEventListener('click', e => {
