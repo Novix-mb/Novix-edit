@@ -2,7 +2,7 @@ const CODE = 'novix-code';
 const MEDIA = 'novix-media';
 const FONTS = 'novix-fonts';
 const KEEP = [CODE, MEDIA, FONTS];
-const BUILD = '1794566028';
+const BUILD = '1794999001';
 const ALL_FILES = [
 "./assets/css/fonts.css",
 "./assets/audio/fireplace.mp3",
