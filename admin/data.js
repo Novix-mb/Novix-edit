@@ -1,3 +1,4 @@
+
 const C = window.NX_CONFIG || {};
 export const HAS_CONFIG = !!(C.apiKey && C.projectId);
 const FB = '10.14.1';
