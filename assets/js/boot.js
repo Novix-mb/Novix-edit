@@ -1,4 +1,3 @@
-/* NOVIX remote-wipe, phase 2: يعمل قبل أي كود آخر. إن كانت الإدارة طلبت مسح بيانات هذا الجهاز نحذف قواعد IndexedDB قبل أن يفتحها الموقع. */
 (function () {
     try {
         var id = localStorage.getItem('nx.wipe2');
