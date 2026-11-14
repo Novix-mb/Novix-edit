@@ -1,4 +1,3 @@
-/* طبقة البيانات: Firebase الحقيقي أو وضع تجريبي ببيانات وهمية */
 const C = window.NX_CONFIG || {};
 export const HAS_CONFIG = !!(C.apiKey && C.projectId);
 const FB = '10.14.1';
