@@ -7,6 +7,12 @@
   <meta name="theme-color" content="#071310">
   <title>NOVIX Admin</title>
   <link rel="icon" href="../assets/img/favicon.ico">
+  <link rel="manifest" href="manifest.webmanifest">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="NOVIX Admin">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <script>
     /* تطبيق المظهر واللغة قبل الرسم لتجنب الوميض */
     try {
@@ -14,6 +20,8 @@
       if (t) document.documentElement.dataset.theme = t;
       document.documentElement.lang = l; document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
     } catch (e) {}
+    /* التقاط حدث التثبيت مبكراً ليستخدمه زر «تثبيت التطبيق» */
+    window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__nxIP = e; window.dispatchEvent(new Event('nx-installable')); });
   </script>
   <link rel="stylesheet" href="../assets/css/fonts.css" media="print" onload="this.media='all'">
   <link rel="stylesheet" href="admin.css">
