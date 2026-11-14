@@ -72,13 +72,15 @@ export async function createFirebaseBackend() {
     ts: msv => F.Timestamp.fromMillis(msv),
     setVisitorNote: (id, note) => F.setDoc(F.doc(db, 'visitors', id), { note }, { merge: true }),
     async deleteVisitor(id) {
-      const q = F.query(col('sessions'), F.where('deviceId', '==', id), F.limit(450));
-      for (let i = 0; i < 10; i++) {
-        const s = await F.getDocs(q); if (s.empty) break;
-        const b = F.writeBatch(db); s.docs.forEach(d => b.delete(d.ref)); await b.commit();
+      let n = 0;
+      for (let i = 0; i < 20; i++) {
+        const s = await F.getDocs(F.query(col('sessions'), F.where('deviceId', '==', id), F.limit(400)));
+        if (s.empty) break;
+        const b = F.writeBatch(db); s.docs.forEach(d => b.delete(d.ref)); await b.commit(); n += s.size;
       }
       await F.deleteDoc(F.doc(db, 'visitors', id));
       try { await F.deleteDoc(F.doc(db, 'control', 'd_' + id)); } catch (e) {}
+      return n;
     },
     async cleanOld(days) {
       const cut = F.Timestamp.fromMillis(Date.now() - days * 864e5); let n = 0;
@@ -172,7 +174,7 @@ export function createDemoBackend() {
     stamp: () => Date.now(), ts: v => v,
     async setControl(id, data) { control[id] = Object.assign(control[id] || {}, data); ctlCb && ctlCb(JSON.parse(JSON.stringify(control))); },
     async setVisitorNote(id, note) { const v = visitors.find(x => x.id === id); if (v) v.note = note; },
-    async deleteVisitor(id) { const i = visitors.findIndex(x => x.id === id); if (i >= 0) visitors.splice(i, 1); for (let k = sessions.length - 1; k >= 0; k--) if (sessions[k].deviceId === id) sessions.splice(k, 1); },
+    async deleteVisitor(id) { let n = sessions.filter(x => x.deviceId === id).length; const i = visitors.findIndex(x => x.id === id); if (i >= 0) visitors.splice(i, 1); for (let k = sessions.length - 1; k >= 0; k--) if (sessions[k].deviceId === id) sessions.splice(k, 1); return n; },
     cleanOld: async () => 0,
     async addAdmin(email, by) { admins.push({ email: email.toLowerCase(), by, at: Date.now() }); admCb && admCb(admins.slice()); },
     async removeAdmin(email) { admins = admins.filter(a => a.email !== email); admCb && admCb(admins.slice()); }
