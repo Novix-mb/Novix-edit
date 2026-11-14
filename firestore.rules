@@ -1,6 +1,4 @@
 rules_version = '2';
-// NOVIX — قواعد Firestore (الصقها كاملة في Firebase Console → Firestore Database → Rules → Publish)
-// الزوار يكتبون إحصاءاتهم فقط ولا يقرؤون شيئاً سوى أوامر الإدارة الخاصة بجهازهم؛ الأدمن وحده يقرأ ويحذف ويتحكم.
 service cloud.firestore {
   match /databases/{database}/documents {
 
@@ -9,27 +7,24 @@ service cloud.firestore {
         && exists(/databases/$(database)/documents/admins/$(request.auth.token.email.lower()));
     }
 
-    // الزوار (الاسم والصورة المصغّرة وتأكيد المسح يكتبها جهاز المستخدم نفسه)
     match /visitors/{id} {
       allow read, delete: if isAdmin();
       allow create: if id.matches('d[0-9a-f]{20}')
-        && request.resource.data.keys().hasOnly(['lastIp','country','device','browser','os','lang','lastSeen','firstSeen','ips','visits','totalSecs','name','photo','profileAt','wipeAck','wipedAt'])
+        && request.resource.data.keys().hasOnly(['lastIp','country','device','browser','os','lang','lastSeen','firstSeen','ips','visits','totalSecs','name','photo','profileAt','wipeAck','wipedAt','pulled','pullId','pulledAt'])
         && (!('name' in request.resource.data) || request.resource.data.name.size() <= 24)
         && (!('photo' in request.resource.data) || request.resource.data.photo.size() <= 30000);
       allow update: if isAdmin() || (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastIp','country','device','browser','os','lang','lastSeen','firstSeen','ips','visits','totalSecs','name','photo','profileAt','wipeAck','wipedAt'])
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastIp','country','device','browser','os','lang','lastSeen','firstSeen','ips','visits','totalSecs','name','photo','profileAt','wipeAck','wipedAt','pulled','pullId','pulledAt'])
         && request.resource.data.name.size() <= 24
         && request.resource.data.get('photo', '').size() <= 30000);
     }
 
-    // الجلسات
     match /sessions/{id} {
       allow read, delete: if isAdmin();
       allow create: if request.resource.data.keys().hasOnly(['deviceId','ip','country','device','browser','os','lang','scr','tz','ref','startedAt','lastSeen','secs','view','views','vsecs','acts']);
       allow update: if request.resource.data.diff(resource.data).affectedKeys().hasOnly(['secs','view','views','vsecs','acts','lastSeen']);
     }
 
-    // سجل الأحداث المباشر (إنشاء فقط من الزائر، ولا يُعدَّل)
     match /events/{id} {
       allow read, delete: if isAdmin();
       allow create: if request.resource.data.keys().hasOnly(['deviceId','sid','type','detail','cat','at'])
@@ -37,7 +32,6 @@ service cloud.firestore {
         && request.resource.data.detail.size() <= 40;
     }
 
-    // أوامر الإدارة: الجهاز يقرأ وثيقته فقط (get)، والقائمة والكتابة للأدمن
     match /control/{id} {
       allow get: if true;
       allow list, write: if isAdmin();
