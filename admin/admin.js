@@ -71,7 +71,7 @@ const S = {
 const PAGES = ['overview', 'live', 'visitors', 'sessions', 'usage', 'controls', 'team', 'settings'];
 if (!PAGES.includes(S.page)) S.page = 'overview';
 const hbSec = Math.max(30, Math.min(300, +C.heartbeatSec || 60));
-const onlineThr = () => Math.max(150, hbSec * 2.5) * 1000;
+const onlineThr = () => Math.max(90, hbSec * 1.6) * 1000;
 const root = $('#root');
 
 /* ============================== التحليلات ============================== */
@@ -354,7 +354,7 @@ function modal({ title, hint, body, ok, danger, onOk }) {
   m.innerHTML = `<form class="box"><h3>${esc(title)}</h3>${hint ? `<p class="hint">${esc(hint)}</p>` : ''}${body || ''}<div class="mact"><button type="button" class="btn" data-act="close">${t('a_cancel')}</button><button type="submit" class="btn ${danger ? 'bad' : 'pri'}">${esc(ok || t('a_confirm'))}</button></div></form>`;
   document.body.append(sh, m);
   const f = $('form', m); const first = $('input,textarea', f); if (first) first.focus();
-  f.onsubmit = async e => { e.preventDefault(); try { await onOk(new FormData(f)); closeLayers(); } catch (err) { console.error(err); toast(t('failed'), 'bad'); } };
+  f.onsubmit = async e => { e.preventDefault(); try { await onOk(new FormData(f)); closeLayers(); } catch (err) { console.error(err); toast(t('failed') + ' — ' + (err && (err.code || err.message) || ''), 'bad'); } };
 }
 function drawer(html) {
   closeLayers();
@@ -403,7 +403,7 @@ function askMsg(id) {
     onOk: async fd => { await S.B.setControl('d_' + id, { message: String(fd.get('text')), msgId: String(Date.now()), msgAt: S.B.stamp() }); toast(t('done')); } });
 }
 function askDel(id) {
-  modal({ title: t('a_delete'), hint: t('sure'), ok: t('a_delete'), danger: true, onOk: async () => { await S.B.deleteVisitor(id); S.visitors = S.visitors.filter(v => v.id !== id); S.sessions = S.sessions.filter(s => s.deviceId !== id); toast(t('done')); renderPage(true); } });
+  modal({ title: t('a_delete'), hint: t('sure'), ok: t('a_delete'), danger: true, onOk: async () => { const n = await S.B.deleteVisitor(id); S.visitors = S.visitors.filter(v => v.id !== id); S.sessions = S.sessions.filter(s => s.deviceId !== id); toast(t('done') + ' · ' + nf(n)); renderPage(true); } });
 }
 async function unban(key) { try { await S.B.setControl(key, { banned: false }); toast(t('done')); } catch (e) { toast(t('failed'), 'bad'); } }
 
