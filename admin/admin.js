@@ -1,4 +1,3 @@
-
 import { L } from './i18n.js';
 import { HAS_CONFIG, createFirebaseBackend, createDemoBackend, ms, ipKey } from './data.js';
 
@@ -14,6 +13,7 @@ let theme = ls('nx.admin.theme') || 'dark';
 const t = (k, v) => { let s = (L[lang] && L[lang][k]) ?? L.en[k] ?? k; if (v) for (const x in v) s = s.replace('{' + x + '}', v[x]); return s; };
 const loc = () => (lang === 'ar' ? 'ar-u-nu-latn' : 'en-US');
 const nf = n => new Intl.NumberFormat('en-US').format(Math.round(n));
+const kb = n => !n ? '—' : n > 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB';
 function applyLang() {
   document.documentElement.lang = lang; document.documentElement.dir = lang === 'ar' ? 'rtl' : 'ltr';
   document.documentElement.dataset.theme = theme;
@@ -459,8 +459,9 @@ function openVisitor(id) {
         <div class="dsec">${t('d_note')}</div><textarea class="inp" id="vnote" maxlength="200" data-id="${esc(id)}">${esc(v.note)}</textarea><div style="margin-top:8px"><button class="btn sm" data-act="vnote" data-id="${esc(id)}">${ic('check')}${t('a_save')}</button></div>
       </div>
       <div class="vpane ${S_vtab === 'tools' ? 'on' : ''}" data-k="tools">
-        <div class="dsec first">${t('d_upd_sec')}</div><div id="vupd">${vUpd(id)}</div>
-        <div class="dsec">${t('d_push')} <button class="btn sm ghost" style="margin-inline-start:8px" data-act="vfetch" data-id="${esc(id)}">${ic('refresh')}${t('d_fetch')}</button></div>
+        <div class="dsec">${t('d_upd_sec')}</div><div id="vupd">${vUpd(id)}</div>
+        <div class="dsec first">${t('d_fetch_sec')}</div><div id="vpull">${pullBox(id)}</div>
+        <div class="dsec">${t('d_push')}</div>
         ${pushBox(id)}
         <div class="dsec">${t('d_actions')}</div><div class="dact" id="vacts" style="margin-top:0">${vActs(id)}</div>
       </div>
@@ -530,6 +531,25 @@ async function sendPush(id, fd) {
   await S.B.setControl('d_' + id, { assign: { id: String(Date.now()), type, payload, by: S.user.email || '' } });
   toast(t('push_sent'));
 }
+/* ====== جلب بيانات الجهاز: ملفاته المرفوعة ومهامه وملاحظاته وجدوله ورسومه على السبورة ====== */
+function pullBox(id) {
+  const v = findVisitor(id); if (!v) return '';
+  const reqId = ((S.control['d_' + id] || {}).pull || {}).id;
+  const pending = !!(reqId && String(v.pullId || '') !== String(reqId));
+  let out = `<button class="btn sm ${pending ? '' : 'pri'}" data-act="vfetch" data-id="${esc(id)}" ${pending ? 'disabled' : ''}>${ic('refresh')}${pending ? t('pull_wait') : t('d_fetch')}</button>`;
+  if (pending) { out += `<small class="vhint">${t('pull_wait_hint')}</small>`; return out; }
+  const p = v.pulled;
+  if (!p) return out + `<small class="vhint">${t('pull_none')}</small>`;
+  const has = (p.tasks && p.tasks.length) || (p.notes && p.notes.length) || (p.sched && p.sched.length) || (p.books && p.books.length) || (p.board && p.board.items);
+  out += `<small class="vhint">${t('pull_at', { d: dtm(v.pulledAt) })}</small><div class="vpulled">`;
+  if (p.tasks && p.tasks.length) out += `<div class="dsec">${t('pull_tasks')} · ${p.tasks.length}</div><div class="chips">${p.tasks.slice(0, 60).map(x => `<span class="chip">${x.d ? ic('check') : ''}${esc(x.t)}</span>`).join('')}</div>`;
+  if (p.notes && p.notes.length) out += `<div class="dsec">${t('pull_notes')} · ${p.notes.length}</div>${p.notes.slice(0, 30).map(n => `<div class="sl"><span>${esc(n.title || t('push_note_title'))}${n.pin ? ' 📌' : ''}</span><b class="mono" style="font-weight:400;color:var(--muted)">${esc((n.body || '').slice(0, 70))}</b></div>`).join('')}`;
+  if (p.sched && p.sched.length) out += `<div class="dsec">${t('pull_sched')} · ${p.sched.length}</div><div class="chips">${p.sched.slice(0, 40).map(x => `<span class="chip">${esc(x.t)}${x.time ? ' · ' + esc(x.time) : ''}</span>`).join('')}</div>`;
+  if (p.books && p.books.length) out += `<div class="dsec">${t('pull_books')} · ${p.books.length}</div><div class="chips">${p.books.slice(0, 40).map(b => `<span class="chip">${esc(b.t || b.fn || '—')}${b.s ? ' · ' + esc(b.s) : ''} · ${kb(b.size)}</span>`).join('')}</div>`;
+  if (p.board && p.board.items) out += `<div class="dsec">${t('pull_board')}</div><div class="chips"><span class="chip">${t('pull_board_pages', { n: nf(p.board.pages || 0) })}</span><span class="chip">${t('pull_board_items', { n: nf(p.board.items || 0) })}</span></div>`;
+  if (!has) out += `<div class="vhint">${t('pull_empty')}</div>`;
+  return out + `</div>`;
+}
 function wipeBox(id) {
   const w = wipeState(id); if (!w) return '';
   return `<div class="hint-box" style="margin:14px 0">${w.done ? ic('check') + ' ' + t('wipe_done_at', { d: dtm(w.at) }) : ic('alert') + ' ' + t('wipe_wait')}</div>`;
@@ -538,7 +558,7 @@ const feedFor = id => { const l = S.events.filter(e => e.deviceId === id).slice(
 function refreshOpen() {
   if (!S.openId || !$('#vmodal')) { S.openId = null; } else {
     const id = S.openId, set = (sel, html) => { const el = $(sel); if (el) el.innerHTML = html; };
-    set('#vwipe', wipeBox(id)); set('#vstat', vStat(id)); set('#vupd', vUpd(id)); set('#vacts', vActs(id));
+    set('#vwipe', wipeBox(id)); set('#vstat', vStat(id)); set('#vupd', vUpd(id)); set('#vacts', vActs(id)); set('#vpull', pullBox(id));
   }
   const fe = $('#vfeed'); if (fe && S.feedId) fe.innerHTML = feedFor(S.feedId);
 }
@@ -627,7 +647,15 @@ document.addEventListener('click', async e => {
     case 'vunban': await unbanVisitor(d.id); break;
     case 'vnote': { const v = $('#vnote'); try { await S.B.setVisitorNote(d.id, v.value.trim()); const x = S.visitors.find(z => z.id === d.id); if (x) x.note = v.value.trim(); toast(t('saved')); } catch (x) { toast(t('failed'), 'bad'); } break; }
     case 'pushtab': pushTab = d.k; refreshPush(d.id); break;
-    case 'vfetch': toast(t('d_fetch_ok')); break;
+    case 'vfetch': {
+      const rid = String(Date.now());
+      try {
+        await S.B.setControl('d_' + d.id, { pull: { id: rid } });
+        S.control['d_' + d.id] = Object.assign({}, S.control['d_' + d.id], { pull: { id: rid } });
+        toast(t('pull_sent')); afterCtl();
+      } catch (e) { toast(t('failed'), 'bad'); }
+      break;
+    }
     case 'morev': S.vShow += 50; renderTbl(); break;
     case 'mores': S.sShow += 50; renderTbl(); break;
     case 'csv': exportCsv(); break;
