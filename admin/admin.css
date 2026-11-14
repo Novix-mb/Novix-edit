@@ -176,6 +176,7 @@ html[dir="rtl"] .drawer { animation-name: slideR; }
   position: fixed; z-index: 70; inset: 0; display: grid; place-items: center; padding: 18px; pointer-events: none;
 }
 .modal .box { pointer-events: auto; width: min(460px, 100%); background: var(--solid); border: 1px solid var(--line2); border-radius: 22px; padding: 24px; box-shadow: var(--shadow); animation: rise .25s both; }
+.modal .box.wide { width: min(640px, 100%); max-height: min(86vh, 900px); overflow-y: auto; position: relative; }
 .modal h3 { margin: 0 0 6px; font-size: 18px; } .modal .hint { color: var(--muted); font-size: 12.5px; margin: 0 0 16px; }
 .fld { display: flex; flex-direction: column; gap: 6px; margin-bottom: 14px; } .fld label { font-size: 12.5px; color: var(--muted); font-weight: 600; }
 .mact { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; }
