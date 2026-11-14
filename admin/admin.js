@@ -250,7 +250,7 @@ function visitorTable() {
     <td class="mono">${esc(v.ip)}${v.ips.length > 1 ? ` <small style="color:var(--muted)">+${v.ips.length - 1}</small>` : ''}</td>
     <td><span class="flag">${flag(v.country)}</span>${esc(cname(v.country))}</td>
     <td>${esc(v.browser)} · ${esc(v.os)}</td><td>${nf(v.visits)}</td><td>${fmtDur(v.totalSecs)}</td><td>${ago(v.last)}</td><td>${statusPill(v, online)}</td>
-    <td><div class="row-act"><button class="btn sm" data-act="vmsg" data-id="${esc(v.id)}" title="${t('a_message')}">${ic('msg')}</button>${isBanned(v) ? `<button class="btn sm" data-act="unban" data-key="d_${esc(v.id)}">${t('a_unban')}</button>` : `<button class="btn sm bad" data-act="vban" data-id="${esc(v.id)}" title="${t('a_ban')}">${ic('ban')}</button>`}</div></td></tr>`).join('');
+    <td><div class="row-act"><button class="btn sm" data-act="vmsg" data-id="${esc(v.id)}" title="${t('a_message')}">${ic('msg')}</button>${isBanned(v) ? `<button class="btn sm pri" data-act="vunban" data-id="${esc(v.id)}">${t('a_unban')}</button>` : `<button class="btn sm bad" data-act="vban" data-id="${esc(v.id)}" title="${t('a_ban')}">${ic('ban')}</button>`}</div></td></tr>`).join('');
   return `<div class="tw"><table><thead><tr><th>${t('th_device')}</th><th>${t('th_ip')}</th><th>${t('th_country')}</th><th>${t('th_env')}</th><th>${t('th_visits')}</th><th>${t('th_time')}</th><th>${t('th_last')}</th><th>${t('th_status')}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
   ${list.length > S.vShow ? `<div class="more"><button class="btn" data-act="morev">${t('a_load_more')} (${nf(list.length - S.vShow)})</button></div>` : ''}`;
 }
@@ -260,7 +260,7 @@ function pVisitors() {
     <div class="search">${ic('search')}<input id="vq" value="${esc(S.vq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div>
     <select class="inp" id="vf">${opt('all', 'v_all', S.vf)}${opt('online', 'v_online', S.vf)}${opt('returning', 'v_returning', S.vf)}${opt('banned', 'v_banned', S.vf)}</select>
     <select class="inp" id="vs">${opt('last', 'sort_last', S.vs)}${opt('visits', 'sort_visits', S.vs)}${opt('time', 'sort_time', S.vs)}${opt('first', 'sort_first', S.vs)}</select>
-    <button class="btn pri" data-act="updall">${ic('bolt')}${t('a_updall')}</button><button class="btn" data-act="csv">${ic('download')}${t('a_export')}</button></div>
+    <button class="btn pri" data-act="updall">${ic('bolt')}${t('a_updall')}</button><button class="btn bad" data-act="vclear">${ic('trash')}${t('a_clear')}</button><button class="btn" data-act="csv">${ic('download')}${t('a_export')}</button></div>
     <div id="tbl">${visitorTable()}</div></div>`;
 }
 
@@ -345,11 +345,24 @@ function shell() {
     <main class="main"><div class="top"><button class="ib menu-btn" data-act="menu">${ic('menu')}</button><div class="grow"><h1 id="ttl"></h1><p id="sub"></p></div><div class="tools" id="tools"></div></div><div id="err"></div><div id="page"></div></main></div>`;
   head(); renderPage(false);
 }
+
+/* ====== تثبيت لوحة الإدارة كتطبيق (PWA) ====== */
+const isStandalone = () => matchMedia('(display-mode: standalone)').matches || !!navigator.standalone;
+const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+const canInstall = () => !isStandalone() && (!!window.__nxIP || isIOS);
+async function installApp() {
+  const ev = window.__nxIP;
+  if (ev) { ev.prompt(); try { await ev.userChoice; } catch (e) {} window.__nxIP = null; head(); }
+  else modal({ title: t('install_title'), hint: t('install_ios_hint'), ok: t('a_confirm'), onOk: async () => {} });
+}
+window.addEventListener('nx-installable', () => { if ($('#tools')) head(); });
+window.addEventListener('appinstalled', () => { window.__nxIP = null; if ($('#tools')) { head(); toast(t('installed')); } });
+if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigator.serviceWorker.register('sw.js').catch(() => {});
 function head() {
   $('#ttl').textContent = t('nav_' + S.page); $('#sub').textContent = t('sub_' + S.page);
   const rng = ['today', '7d', '30d', 'all'].map(r => `<button data-act="range" data-v="${r}" class="${S.range === r ? 'on' : ''}">${t('r_' + r)}</button>`).join('');
   $('#tools').innerHTML = `${S.demo ? `<span class="badge-demo">${t('demo_badge')}</span>` : ''}${RANGED.includes(S.page) ? `<div class="seg">${rng}</div>` : ''}
-    <button class="ib" data-act="refresh" title="${t('a_refresh')}">${ic('refresh')}</button><button class="ib" data-act="lang" data-v="${lang === 'ar' ? 'en' : 'ar'}" title="Language"><b style="font-size:12px">${lang === 'ar' ? 'EN' : 'ع'}</b></button><button class="ib" data-act="theme" data-v="${theme === 'dark' ? 'light' : 'dark'}">${ic(theme === 'dark' ? 'sun' : 'moon')}</button>`;
+    ${canInstall() ? `<button class="btn sm pri" data-act="install">${ic('download')}${t('a_install')}</button>` : ''}<button class="ib" data-act="refresh" title="${t('a_refresh')}">${ic('refresh')}</button><button class="ib" data-act="lang" data-v="${lang === 'ar' ? 'en' : 'ar'}" title="Language"><b style="font-size:12px">${lang === 'ar' ? 'EN' : 'ع'}</b></button><button class="ib" data-act="theme" data-v="${theme === 'dark' ? 'light' : 'dark'}">${ic(theme === 'dark' ? 'sun' : 'moon')}</button>`;
   $$('.nav a').forEach(a => a.classList.toggle('on', a.dataset.page === S.page));
 }
 let lastPage = null;
@@ -407,13 +420,12 @@ function vStat(id) {
 function vUpd(id) {
   const locked = !!(S.control['d_' + id] || {}).updLock;
   return `<div class="vupd"><button class="btn pri" data-act="updnow" data-id="${esc(id)}">${ic('refresh')}${t('a_updnow')}</button>
-    <button class="btn ${locked ? 'pri' : ''}" data-act="updlock" data-id="${esc(id)}">${ic('bolt')}${locked ? t('a_updunlock') : t('a_updlock')}</button>
-    <button class="btn" data-act="updall">${ic('users')}${t('a_updall')}</button></div>
+    <button class="btn ${locked ? 'pri' : ''}" data-act="updlock" data-id="${esc(id)}">${ic('bolt')}${locked ? t('a_updunlock') : t('a_updlock')}</button></div>
     <small class="vhint">${locked ? t('d_upd_locked_hint') : t('d_upd_hint')}</small>`;
 }
 function vActs(id) {
-  const v = findVisitor(id), banned = isBanned(v);
-  return `<button class="btn" data-act="vmsg" data-id="${esc(id)}">${ic('msg')}${t('a_message')}</button>${banned ? `<button class="btn" data-act="unban" data-key="d_${esc(id)}">${t('a_unban')}</button>` : `<button class="btn bad" data-act="vban" data-id="${esc(id)}">${ic('ban')}${t('a_ban')}</button>${v.ip !== 'unknown' ? `<button class="btn bad" data-act="vbanip" data-ip="${esc(v.ip)}">${ic('ban')}${t('a_banip')}</button>` : ''}`}<button class="btn bad" data-act="vwipe" data-id="${esc(id)}">${ic('trash')}${t('a_wipe')}</button><button class="btn" data-act="vdel" data-id="${esc(id)}">${ic('x')}${t('a_delrec')}</button>`;
+  const v = findVisitor(id), devBan = banActive(S.control['d_' + id]), ipBan = !!(v.ip && banActive(S.control[ipKey(v.ip)]));
+  return `<button class="btn" data-act="vmsg" data-id="${esc(id)}">${ic('msg')}${t('a_message')}</button>${devBan ? `<button class="btn pri" data-act="unban" data-key="d_${esc(id)}">${ic('check')}${t('a_unban_dev')}</button>` : `<button class="btn bad" data-act="vban" data-id="${esc(id)}">${ic('ban')}${t('a_ban')}</button>`}${v.ip !== 'unknown' ? (ipBan ? `<button class="btn pri" data-act="unban" data-key="${esc(ipKey(v.ip))}">${ic('check')}${t('a_unban_ip')}</button>` : `<button class="btn bad" data-act="vbanip" data-ip="${esc(v.ip)}">${ic('ban')}${t('a_banip')}</button>`) : ''}<button class="btn bad" data-act="vwipe" data-id="${esc(id)}">${ic('trash')}${t('a_wipe')}</button><button class="btn" data-act="vdel" data-id="${esc(id)}">${ic('x')}${t('a_delrec')}</button>`;
 }
 function setVTab(k) {
   S_vtab = k;
@@ -534,10 +546,48 @@ function askWipe(id) {
   modal({ title: t('wipe_title') + ' · ' + nm, hint: t('wipe_hint'), ok: t('a_wipe'), danger: true,
     onOk: async () => { await S.B.wipeUser(id, S.user.email || ''); toast(t('wipe_sent')); } });
 }
+
+/* ====== مسح سجل الأجهزة حسب وقت آخر ظهور ====== */
+const CLR_PRESETS = [['3600000', 'clr_1h'], ['21600000', 'clr_6h'], ['86400000', 'clr_1d'], ['259200000', 'clr_3d'], ['604800000', 'clr_7d'], ['2592000000', 'clr_30d'], ['0', 'clr_all'], ['custom', 'clr_custom']];
+function clrMs(fd) {
+  const k = fd.get('clrsel'); if (k !== 'custom') return +k;
+  const n = Math.max(1, +fd.get('clrn') || 1); return n * ({ m: 60e3, h: 3600e3, d: 864e5 }[fd.get('clru')] || 864e5);
+}
+function clrTargets(ms, keep) { const cut = Date.now() - ms; return S.visitors.filter(v => (ms > 0 ? (v.last || 0) < cut : true) && !(keep && isBanned(v))); }
+function askClearVisitors() {
+  modal({ title: t('clr_title'), hint: t('clr_hint'), ok: t('clr_ok'), danger: true,
+    body: `<div class="fld"><label>${t('clr_older')}</label><select class="inp" name="clrsel" id="clrsel">${CLR_PRESETS.map(([v, k]) => `<option value="${v}" ${v === '86400000' ? 'selected' : ''}>${t(k)}</option>`).join('')}</select></div>
+      <div class="fld" id="clrcus" style="display:none"><div style="display:flex;gap:8px"><input class="inp" type="number" min="1" name="clrn" id="clrn" value="1" style="flex:1"><select class="inp" name="clru" id="clru" style="flex:1"><option value="m">${t('clr_u_m')}</option><option value="h">${t('clr_u_h')}</option><option value="d" selected>${t('clr_u_d')}</option></select></div></div>
+      <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0 12px;cursor:pointer"><input type="checkbox" name="keepban" id="clrkeep" checked> <span>${t('clr_keep')}</span></label>
+      <div class="vhint" id="clrcnt" style="font-weight:700"></div>`,
+    onOk: async fd => {
+      const ms = clrMs(fd), keep = !!fd.get('keepban'), skip = keep ? S.visitors.filter(isBanned).map(v => v.id) : [];
+      const ids = await S.B.cleanVisitors(ms, skip), set = new Set(ids);
+      S.visitors = S.visitors.filter(v => !set.has(v.id)); S.sessions = S.sessions.filter(x => !set.has(x.deviceId));
+      toast(t('done') + ' · ' + nf(ids.length)); renderPage(true);
+    } });
+  const f = $('.modal form'), upd = () => {
+    $('#clrcus').style.display = $('#clrsel').value === 'custom' ? '' : 'none';
+    const fd = new FormData(f); $('#clrcnt').textContent = t('clr_count', { n: nf(clrTargets(clrMs(fd), !!fd.get('keepban')).length) });
+  };
+  f.addEventListener('input', upd); f.addEventListener('change', upd); upd();
+}
 function askDel(id) {
   modal({ title: t('a_delete'), hint: t('sure'), ok: t('a_delete'), danger: true, onOk: async () => { const n = await S.B.deleteVisitor(id); S.visitors = S.visitors.filter(v => v.id !== id); S.sessions = S.sessions.filter(s => s.deviceId !== id); closeLayers(); toast(t('done') + ' · ' + nf(n)); renderPage(true); } });
 }
-async function unban(key) { try { await S.B.setControl(key, { banned: false }); toast(t('done')); } catch (e) { toast(t('failed'), 'bad'); } }
+function afterCtl() { refreshOpen(); if (S.page === 'visitors') renderTbl(); else if (S.page === 'controls') renderPage(true); }
+/* يرفع الحظر فوراً ويحدّث الأزرار دون انتظار وصول التحديث من الخادم */
+async function unban(...keys) {
+  try {
+    for (const key of keys) { await S.B.setControl(key, { banned: false }); S.control[key] = Object.assign({}, S.control[key], { banned: false }); }
+    toast(t('unbanned')); afterCtl();
+  } catch (e) { console.error(e); toast(t('failed'), 'bad'); }
+}
+function unbanVisitor(id) {
+  const v = findVisitor(id); if (!v) return;
+  const keys = []; if (banActive(S.control['d_' + id])) keys.push('d_' + id); if (v.ip && banActive(S.control[ipKey(v.ip)])) keys.push(ipKey(v.ip));
+  return unban(...keys);
+}
 
 function download(name, text, type) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -573,12 +623,15 @@ document.addEventListener('click', async e => {
     case 'vdel': askDel(d.id); break;
     case 'vwipe': askWipe(d.id); break;
     case 'unban': await unban(d.key); break;
+    case 'vunban': await unbanVisitor(d.id); break;
     case 'vnote': { const v = $('#vnote'); try { await S.B.setVisitorNote(d.id, v.value.trim()); const x = S.visitors.find(z => z.id === d.id); if (x) x.note = v.value.trim(); toast(t('saved')); } catch (x) { toast(t('failed'), 'bad'); } break; }
     case 'pushtab': pushTab = d.k; refreshPush(d.id); break;
     case 'vfetch': toast(t('d_fetch_ok')); break;
     case 'morev': S.vShow += 50; renderTbl(); break;
     case 'mores': S.sShow += 50; renderTbl(); break;
     case 'csv': exportCsv(); break;
+    case 'vclear': askClearVisitors(); break;
+    case 'install': await installApp(); break;
     case 'json': download('novix-visitors.json', JSON.stringify(S.visitors, null, 2), 'application/json'); break;
     case 'admrm': modal({ title: t('t_remove'), hint: d.email, ok: t('t_remove'), danger: true, onOk: async () => { await S.B.removeAdmin(d.email); toast(t('done')); } }); break;
     case 'updall': modal({ title: t('ctl_upd_all'), hint: t('ctl_upd_all_hint'), ok: t('ctl_upd_all'), onOk: async () => { await S.B.setControl('config', { forceUpdAll: { id: String(Date.now()) } }); toast(t('push_sent')); } }); break;
