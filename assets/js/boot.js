@@ -1,3 +1,17 @@
+/* NOVIX remote-wipe, phase 2: يعمل قبل أي كود آخر. إن كانت الإدارة طلبت مسح بيانات هذا الجهاز نحذف قواعد IndexedDB قبل أن يفتحها الموقع. */
+(function () {
+    try {
+        var id = localStorage.getItem('nx.wipe2');
+        if (!id) return;
+        var names = ['novix-lib', 'novix-sw', 'novix-focus', 'novix-gn'];
+        function del(n) { try { indexedDB.deleteDatabase(n); } catch (e) {} }
+        names.forEach(del);
+        if (indexedDB.databases) indexedDB.databases().then(function (l) { (l || []).forEach(function (d) { if (d && d.name && names.indexOf(d.name) < 0) del(d.name); }); }).catch(function () {});
+        localStorage.removeItem('nx.wipe2');
+        localStorage.setItem('nx.wipeack', id);
+    } catch (e) {}
+})();
+
         try {
             var __s = JSON.parse(localStorage.getItem("novix.site.v1") || "null"),
                 __d = matchMedia("(prefers-color-scheme: dark)").matches;
