@@ -311,9 +311,10 @@
   /* حالة الأوامر الحالية (تُحدَّث لحظياً من Firestore أو بالاستعلام الدوري) */
   var ctl = { cfg: {}, dev: null, ipb: null }, started = false, ready = false, liveOK = false;
 
-  /* ---------- مهمة/ملاحظة/جدول يرسلها الأدمن لهذا الجهاز ---------- */
-  function applyAssign(as) {
-    ls('nx.assign', String(as.id));
+  /* ---------- مهمة/ملاحظة/جدول يرسلها الأدمن لهذا الجهاز: تُطبَّق فوراً بلا إعادة تحميل ---------- */
+  function applyAssignNow(as) {
+    if (window.NXAPPLY) { try { window.NXAPPLY(as.type, as.payload || {}); } catch (e) {} return; }
+    // التطبيق لم يُحمَّل بعد (الصفحة لسة بتفتح) — أضف للتخزين مباشرة فيلتقطها عند الفتح، بلا إعادة تحميل قسري
     try {
       var o = null;
       try { o = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch (e) {}
@@ -334,14 +335,33 @@
       o.nid = nid;
       _set.call(localStorage, PROFILE_KEY, JSON.stringify(o));
     } catch (e) {}
-    location.reload();
+  }
+  function applyAssign(as) {
+    ls('nx.assign', String(as.id));
+    var tries = 0;
+    (function tryApply() {
+      if (window.NXAPPLY || tries > 20) { applyAssignNow(as); return; }
+      tries++; setTimeout(tryApply, 250);
+    })();
   }
 
+  /* ---------- توقيف/تشغيل تحديث الموقع لهذا الجهاز + تحديث فوري من الإدارة ---------- */
+  function whenUpd(fn) {
+    var tries = 0;
+    (function go() { if (window.NXUPD) { fn(window.NXUPD); return; } if (tries++ > 40) return; setTimeout(go, 250); })();
+  }
   function applyState() {
     var cfg = ctl.cfg || {}, dev = ctl.dev, ipb = ctl.ipb;
     var ban = active(dev) ? dev : (active(ipb) ? ipb : null);
     if (dev && dev.wipeId && String(dev.wipeId) !== ls('nx.wiped')) { doWipe(String(dev.wipeId)); return; }
-    if (dev && dev.assign && dev.assign.id && String(dev.assign.id) !== ls('nx.assign')) { applyAssign(dev.assign); return; }
+    if (dev && dev.assign && dev.assign.id && String(dev.assign.id) !== ls('nx.assign')) applyAssign(dev.assign);
+    whenUpd(function (u) { u.setLock(!!(dev && dev.updLock)); });
+    if (dev && dev.forceUpd && dev.forceUpd.id && String(dev.forceUpd.id) !== ls('nx.forceupd')) {
+      ls('nx.forceupd', String(dev.forceUpd.id)); whenUpd(function (u) { u.forceApply(); });
+    }
+    if (cfg.forceUpdAll && cfg.forceUpdAll.id && String(cfg.forceUpdAll.id) !== ls('nx.forceupdall')) {
+      ls('nx.forceupdall', String(cfg.forceUpdAll.id)); whenUpd(function (u) { u.forceApply(); });
+    }
     stopped = !!(cfg.track === false || ban);
     if (ban) { overlay('nx-ban', T.banned[0], ban.reason || T.banned[1], false); return; }
     clearOverlay('nx-ban');
