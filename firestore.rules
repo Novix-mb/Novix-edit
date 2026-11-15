@@ -10,12 +10,12 @@ service cloud.firestore {
     match /visitors/{id} {
       allow read, delete: if isAdmin();
       allow create: if id.matches('d[0-9a-f]{20}')
-        && request.resource.data.keys().hasOnly(['lastIp','country','device','browser','os','lang','lastSeen','firstSeen','ips','visits','totalSecs','name','photo','profileAt','wipeAck','wipedAt','pulled','pullId','pulledAt'])
+        && request.resource.data.keys().hasOnly(['lastIp','country','device','browser','os','lang','lastSeen','firstSeen','ips','visits','totalSecs','name','photo','profileAt','wipeAck','wipedAt','pulled','pullId','pulledAt','pullErr'])
         && (!('name' in request.resource.data) || request.resource.data.name.size() <= 24)
         && (!('photo' in request.resource.data) || request.resource.data.photo.size() <= 30000);
       allow update: if isAdmin() || (
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastIp','country','device','browser','os','lang','lastSeen','firstSeen','ips','visits','totalSecs','name','photo','profileAt','wipeAck','wipedAt','pulled','pullId','pulledAt'])
-        && request.resource.data.name.size() <= 24
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastIp','country','device','browser','os','lang','lastSeen','firstSeen','ips','visits','totalSecs','name','photo','profileAt','wipeAck','wipedAt','pulled','pullId','pulledAt','pullErr'])
+        && request.resource.data.get('name', '').size() <= 24
         && request.resource.data.get('photo', '').size() <= 30000);
     }
 
