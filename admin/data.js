@@ -20,7 +20,7 @@ const normVisitor = (id, d) => ({
   os: d.os || '', lang: d.lang || '', visits: d.visits || 0, totalSecs: d.totalSecs || 0,
   first: ms(d.firstSeen), last: ms(d.lastSeen), note: d.note || '',
   name: d.name || '', photo: d.photo || '', wipeAck: d.wipeAck ? String(d.wipeAck) : '', wipedAt: ms(d.wipedAt),
-  pulled: d.pulled || null, pullId: d.pullId ? String(d.pullId) : '', pulledAt: ms(d.pulledAt)
+  pulled: d.pulled || null, pullId: d.pullId ? String(d.pullId) : '', pulledAt: ms(d.pulledAt), pullErr: d.pullErr ? String(d.pullErr) : ''
 });
 const normEvent = (id, d) => ({ id, deviceId: d.deviceId || '', sid: d.sid || '', type: d.type || '', detail: d.detail || '', at: ms(d.at) || d.cat || 0 });
 export const ipKey = ip => 'i_' + String(ip).replace(/[^a-zA-Z0-9]/g, '_');
@@ -68,6 +68,28 @@ export async function createFirebaseBackend() {
       let n = 0;
       for (let i = 0; i < 20; i++) {
         const s = await F.getDocs(F.query(col('events'), F.where('deviceId', '==', id), F.limit(400)));
+        if (s.empty) break;
+        const b = F.writeBatch(db); s.docs.forEach(d => b.delete(d.ref)); await b.commit(); n += s.size;
+      }
+      return n;
+    },
+    /* حذف الأنشطة (events) والجلسات (السجلات) */
+    deleteEvent: id => F.deleteDoc(F.doc(db, 'events', id)),
+    async clearEvents(deviceId) {
+      let n = 0;
+      for (let i = 0; i < 200; i++) {
+        const q = deviceId ? F.query(col('events'), F.where('deviceId', '==', deviceId), F.limit(400)) : F.query(col('events'), F.limit(400));
+        const s = await F.getDocs(q);
+        if (s.empty) break;
+        const b = F.writeBatch(db); s.docs.forEach(d => b.delete(d.ref)); await b.commit(); n += s.size;
+      }
+      return n;
+    },
+    deleteSession: id => F.deleteDoc(F.doc(db, 'sessions', id)),
+    async clearSessions() {
+      let n = 0;
+      for (let i = 0; i < 200; i++) {
+        const s = await F.getDocs(F.query(col('sessions'), F.limit(400)));
         if (s.empty) break;
         const b = F.writeBatch(db); s.docs.forEach(d => b.delete(d.ref)); await b.commit(); n += s.size;
       }
@@ -203,7 +225,7 @@ export function createDemoBackend() {
     ['d_' + devices[40].id]: { banned: true, until: null, reason: 'استخدام مسيء', type: 'device', value: devices[40].id, at: now - 2 * 864e5, by: 'demo@novix' }
   };
   let admins = [{ email: 'owner@example.com', by: '', at: now - 40 * 864e5 }, { email: 'friend@example.com', by: 'owner@example.com', at: now - 9 * 864e5 }];
-  let ctlCb = null, admCb = null;
+  let ctlCb = null, admCb = null, visCb = null, demoEvents = null;
 
   return {
     demo: true, projectId: 'demo',
@@ -214,16 +236,44 @@ export function createDemoBackend() {
     watchControl(cb) { ctlCb = cb; setTimeout(() => cb(JSON.parse(JSON.stringify(control))), 80); },
     watchAdmins(cb) { admCb = cb; setTimeout(() => cb(admins.slice()), 80); },
     loadVisitors: async () => visitors.map(v => ({ ...v })),
-    watchVisitors(limit, cb) { setTimeout(() => cb(visitors.map(v => ({ ...v }))), 100); },
+    watchVisitors(limit, cb) { visCb = cb; setTimeout(() => cb(visitors.map(v => ({ ...v }))), 100); },
     watchEvents(limit, cb) {
       const T = ['view', 'act', 'view', 'show'], D = ['tasks', 'timer_start', 'library', ''];
       const mk = i => { const k = i % 4; return { id: 'e' + i, deviceId: devices[i % 9].id, sid: '', type: T[k], detail: D[k], at: Date.now() - i * 17000 }; };
-      setTimeout(() => cb(Array.from({ length: 30 }, (_, i) => mk(i))), 120);
+      if (!demoEvents) demoEvents = Array.from({ length: 30 }, (_, i) => mk(i));
+      setTimeout(() => cb(demoEvents.slice()), 120);
     },
+    async deleteEvent(id) { demoEvents = (demoEvents || []).filter(e => e.id !== id); },
+    async clearEvents(deviceId) { const n = (demoEvents || []).length; demoEvents = deviceId ? (demoEvents || []).filter(e => e.deviceId !== deviceId) : []; return n; },
+    async deleteSession(id) { const i = sessions.findIndex(x => x.id === id); if (i >= 0) sessions.splice(i, 1); },
+    async clearSessions() { const n = sessions.length; sessions.length = 0; return n; },
     async wipeUser(id) { control['d_' + id] = Object.assign(control['d_' + id] || {}, { wipeId: String(Date.now()) }); ctlCb && ctlCb(JSON.parse(JSON.stringify(control))); return 0; },
     counts: async () => ({ visitors: 1284, sessions: 6420 }),
     stamp: () => Date.now(), ts: v => v,
-    async setControl(id, data) { control[id] = Object.assign(control[id] || {}, data); ctlCb && ctlCb(JSON.parse(JSON.stringify(control))); },
+    async setControl(id, data) {
+      control[id] = Object.assign(control[id] || {}, data); ctlCb && ctlCb(JSON.parse(JSON.stringify(control)));
+      /* محاكاة جهاز يردّ على طلب الجلب ويطبّق أوامر التعديل/الحذف (للتجربة فقط) */
+      if (id.startsWith('d_') && data.pull && data.pull.id) setTimeout(() => {
+        const v = visitors.find(x => x.id === id.slice(2)); if (!v) return;
+        if (!v.pulled) v.pulled = {
+          tasks: [{ id: 1, t: 'حل واجب الفيزياء', p: 'High', d: 0, tr: 0 }, { id: 2, t: 'مراجعة الفصل الثالث', p: 'Medium', d: 1, tr: 0 }, { id: 3, t: 'ترتيب المكتب', p: 'Low', d: 0, tr: 0 }],
+          notes: [{ id: 4, title: 'أفكار المشروع', body: 'فكرة عن تطبيق للدراسة...', pin: 1, ts: now, tr: 0 }],
+          sched: [{ id: 5, t: 'درس الرياضيات', day: 1, time: '17:30', tr: 0 }],
+          books: [{ id: 6, t: 'كتاب الكيمياء', s: 'Chemistry', fn: 'chem.pdf', ty: 'pdf', size: 8400000, tr: 0 }],
+          board: { pages: 2, items: 14 }
+        };
+        const ops = (control[id].dataOps && control[id].dataOps.id && +control[id].dataOps.id <= +data.pull.id) ? control[id].dataOps.ops || [] : [];
+        ops.forEach(op => {
+          if (op.c === 'board') { if (op.a === 'clear') v.pulled.board = { pages: 0, items: 0 }; return; }
+          const arr = v.pulled[op.c]; if (!Array.isArray(arr)) return;
+          if (op.a === 'clear') { arr.length = 0; return; }
+          const i = arr.findIndex(x => String(x.id) === String(op.id)); if (i < 0) return;
+          if (op.a === 'del') arr.splice(i, 1); else if (op.a === 'set') Object.assign(arr[i], op.v || {});
+        });
+        v.pullId = String(data.pull.id); v.pulledAt = Date.now();
+        visCb && visCb(visitors.map(x => ({ ...x })));
+      }, 900);
+    },
     async setVisitorNote(id, note) { const v = visitors.find(x => x.id === id); if (v) v.note = note; },
     async deleteVisitor(id) { let n = sessions.filter(x => x.deviceId === id).length; const i = visitors.findIndex(x => x.id === id); if (i >= 0) visitors.splice(i, 1); for (let k = sessions.length - 1; k >= 0; k--) if (sessions[k].deviceId === id) sessions.splice(k, 1); return n; },
     async cleanVisitors(ms, skip) { const sk = new Set(skip || []), cut = Date.now() - ms; const ids = visitors.filter(v => !sk.has(v.id) && (ms > 0 ? (v.last || 0) < cut : true)).map(v => v.id); for (const id of ids) await this.deleteVisitor(id); return ids; },
