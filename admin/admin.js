@@ -431,7 +431,7 @@ function shell() {
   const u = S.user, name = myName();
   const nav = NAV.map(([p, i], idx) => `${idx === 0 ? `<div class="nav-h">${t('sec_analytics')}</div>` : ''}${p === 'controls' ? `<div class="nav-h">${t('sec_manage')}</div>` : ''}<a data-act="nav" data-page="${p}" class="${S.page === p ? 'on' : ''}">${ic(i)}<span>${t('nav_' + p)}</span>${p === 'live' ? '<span class="cnt" id="liveCnt">0</span>' : ''}</a>`).join('');
   const bn = [['overview', 'dash'], ['live', 'pulse'], ['visitors', 'users'], ['controls', 'sliders']].map(([p, i]) => `<a data-act="nav" data-page="${p}" class="${S.page === p ? 'on' : ''}">${ic(i)}<span>${t('nav_' + p)}</span>${p === 'live' ? '<em class="cnt" id="liveCnt2">0</em>' : ''}</a>`).join('') + `<a data-act="menu">${ic('menu')}<span>${t('nav_more')}</span></a>`;
-  root.innerHTML = `<div class="app"><aside class="side"><div class="brand"><img src="../assets/img/novix-icon-64.png" alt=""><div><b>NOVIX</b><small>${t('app')}</small></div></div><nav class="nav">${nav}</nav>
+  root.innerHTML = `<div class="app"><aside class="side"><div class="brand"><img src="worker/icon-192.png" alt=""><div><b>NOVIX</b><small>${t('app')}</small></div></div><nav class="nav">${nav}</nav>
     <div class="side-foot"><div class="me" data-act="nav" data-page="settings" style="cursor:pointer"><span class="av">${u.photoURL ? `<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" alt="">` : esc(name.slice(0, 1).toUpperCase())}</span><div><b id="meName">${esc(name)}</b><small>${esc(u.email || '')}</small></div></div><button class="btn" data-act="signout">${ic('logout')}${t('signout')}</button></div></aside>
     <main class="main"><div class="top"><button class="ib menu-btn" data-act="menu">${ic('menu')}</button><div class="grow"><h1 id="ttl"></h1><p id="sub"></p></div><div class="tools" id="tools"></div></div><div id="err"></div><div id="page"></div></main><nav class="bnav">${bn}</nav></div>`;
   head(); renderPage(false);
@@ -1030,7 +1030,7 @@ async function startApp() {
 }
 
 const gate = html => { root.innerHTML = `<div class="gate"><div class="card box">${html}</div></div>`; };
-const logo = '<img src="../assets/img/novix-icon-256.png" alt="">';
+const logo = '<img src="worker/icon-192.png" alt="">';
 function showSetup() {
   applyLang();
   gate(`${logo}<h1>${t('setup_title')}</h1><p>${t('setup_sub')}</p><a class="btn pri" href="?demo=1" style="text-decoration:none">${t('setup_btn')}</a>`);
@@ -1059,4 +1059,3 @@ async function boot() {
   });
 }
 boot();
-
