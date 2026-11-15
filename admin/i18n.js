@@ -157,6 +157,7 @@ export const L = {
     vs_prev: 'مقارنة بالفترة السابقة', vs_prev_b: 'عن السابق', k_peak: 'الذروة', k_avgb: 'المتوسط', k_totalv: 'الإجمالي', per_h: 'في الساعة', per_d: 'في اليوم',
     less: 'أقل', more: 'أكثر', other: 'أخرى', v_bulk: 'إجراءات جماعية', nav_more: 'المزيد', fl_on: 'مفعّل', fl_off: 'معطّل',
     set_profile: 'الملف الشخصي', set_name: 'اسم الأدمن', set_name_ph: 'اكتب اسمك', set_name_sub: 'يظهر في الشريط الجانبي والترحيب وقائمة الفريق.',
+    set_avatar: 'الصورة الشخصية', set_avatar_sub: 'تظهر في الشريط الجانبي بدل الحرف الأول. يُفضّل استخدام صورة مربعة.', a_choose: 'اختيار صورة', a_remove: 'إزالة',
     set_bulk: 'إجراءات جماعية', set_bulk_sub: 'تؤثر على كل الزوار — استخدمها بحذر.', set_all_hint: 'يحذف كل الزوار مع جلساتهم وأحداثهم نهائياً.',
     upd_ready: 'يتوفر إصدار جديد من اللوحة', upd_now: 'تحديث الآن',
   },
@@ -318,6 +319,7 @@ export const L = {
     vs_prev: 'vs previous period', vs_prev_b: 'vs previous', k_peak: 'Peak', k_avgb: 'Average', k_totalv: 'Total', per_h: 'per hour', per_d: 'per day',
     less: 'Less', more: 'More', other: 'Other', v_bulk: 'Bulk actions', nav_more: 'More', fl_on: 'On', fl_off: 'Off',
     set_profile: 'Profile', set_name: 'Admin name', set_name_ph: 'Your name', set_name_sub: 'Shown in the sidebar, the greeting and the team list.',
+    set_avatar: 'Profile picture', set_avatar_sub: 'Shown in the sidebar instead of your initial. A square image works best.', a_choose: 'Choose picture', a_remove: 'Remove',
     set_bulk: 'Bulk actions', set_bulk_sub: 'These affect every visitor — use with care.', set_all_hint: 'Permanently deletes all visitors with their sessions and events.',
     upd_ready: 'A new version of the panel is available', upd_now: 'Update now',
   }

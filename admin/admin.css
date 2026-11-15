@@ -44,8 +44,9 @@ html[dir="rtl"] .nav a:hover { transform: translateX(3px); }
 .cnt { margin-inline-start: auto; font-size: 11px; font-style: normal; padding: 1px 8px; border-radius: 99px; background: color-mix(in srgb, var(--ok) 20%, transparent); color: var(--ok); font-weight: 700; }
 .side-foot { margin-top: auto; display: flex; flex-direction: column; gap: 10px; padding-top: 14px; }
 .me { display: flex; align-items: center; gap: 10px; padding: 10px; border-radius: 16px; background: var(--card2); border: 1px solid var(--line); }
-.me .av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; color: #06231f; background: linear-gradient(135deg, var(--acc), var(--acc2)); flex: none; overflow: hidden; }
-.me .av img { width: 100%; height: 100%; object-fit: cover; }
+.av { width: 38px; height: 38px; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 16px; color: #06231f; background: linear-gradient(135deg, var(--acc), var(--acc2)); flex: none; overflow: hidden; }
+.av img { width: 100%; height: 100%; object-fit: cover; }
+.av-lg { width: 64px; height: 64px; font-size: 24px; }
 .me div { min-width: 0; } .me b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .me small { color: var(--muted); font-size: 11px; display: block; overflow: hidden; text-overflow: ellipsis; }
 
 .main { min-width: 0; padding: 0 var(--pad) 60px; }

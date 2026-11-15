@@ -40,6 +40,22 @@ const devLabel = d => t(d === 'mobile' || d === 'tablet' || d === 'desktop' ? d 
 const COLORS = ['var(--acc)', 'var(--acc2)', 'var(--acc3)', 'var(--warn)', '#f78fb3', '#8d9b97'];
 
 const myName = () => { const me = ((S.user && S.user.email) || '').toLowerCase(), a = S.admins.find(x => x.email === me); return (a && a.name) || ls('nx.admin.myname') || (S.user && (S.user.displayName || S.user.email)) || ''; };
+const myAvatar = () => ls('nx.admin.myavatar') || (S.user && S.user.photoURL) || '';
+function resizeAvatar(file, size = 160) {
+  return new Promise((resolve, reject) => {
+    const img = new Image(), url = URL.createObjectURL(file);
+    img.onload = () => {
+      URL.revokeObjectURL(url);
+      try {
+        const s = Math.min(img.naturalWidth, img.naturalHeight), sx = (img.naturalWidth - s) / 2, sy = (img.naturalHeight - s) / 2;
+        const cv = document.createElement('canvas'); cv.width = size; cv.height = size;
+        const ctx = cv.getContext('2d'); ctx.drawImage(img, sx, sy, s, s, 0, 0, size, size);
+        resolve(cv.toDataURL('image/jpeg', 0.85));
+      } catch (e) { reject(e); }
+    };
+    img.onerror = reject; img.src = url;
+  });
+}
 const IC = {
   dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -404,7 +420,13 @@ function pSettings() {
   const days = [30, 60, 90, 180].map(n => `<option value="${n}">${t('set_days', { n })}</option>`).join('');
   const ob = !!(S.control.config || {}).offlineBlock;
   const row = (c, i, title, sub, btn) => `<div class="brow" style="--c:var(${c})"><span class="ic">${ic(i)}</span><div><b>${title}</b><small>${sub}</small></div>${btn}</div>`;
+  const av = myAvatar();
   return `<div class="grid g-2e"><div class="card"><h3>${ic('users')} ${t('set_profile')}</h3>
+    <div class="fld"><label>${t('set_avatar')}</label><div class="inl" style="align-items:center">
+      <span class="av av-lg" id="setAv">${av ? `<img src="${esc(av)}" referrerpolicy="no-referrer" alt="">` : esc(myName().slice(0, 1).toUpperCase())}</span>
+      <div class="inl" style="gap:8px"><button class="btn sm" type="button" data-act="avpick">${ic('users')}${t('a_choose')}</button>${av ? `<button class="btn sm bad" type="button" data-act="avrm">${ic('trash')}${t('a_remove')}</button>` : ''}</div>
+      <input type="file" id="avInput" accept="image/*" style="display:none"></div>
+    <small style="color:var(--muted)">${t('set_avatar_sub')}</small></div>
     <form data-form="myname"><div class="fld"><label>${t('set_name')}</label><input class="inp" name="name" maxlength="24" value="${esc(myName())}" placeholder="${esc(t('set_name_ph'))}" autocomplete="off"><small style="color:var(--muted)">${t('set_name_sub')}</small></div>
     <button class="btn pri" type="submit">${ic('check')}${t('a_save')}</button></form></div>
   <div class="card"><div class="fld"><label>${t('set_lang')}</label><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="ar" class="${lang === 'ar' ? 'on' : ''}">العربية</button><button data-act="lang" data-v="en" class="${lang === 'en' ? 'on' : ''}">English</button></div></div>
@@ -431,8 +453,8 @@ function shell() {
   const u = S.user, name = myName();
   const nav = NAV.map(([p, i], idx) => `${idx === 0 ? `<div class="nav-h">${t('sec_analytics')}</div>` : ''}${p === 'controls' ? `<div class="nav-h">${t('sec_manage')}</div>` : ''}<a data-act="nav" data-page="${p}" class="${S.page === p ? 'on' : ''}">${ic(i)}<span>${t('nav_' + p)}</span>${p === 'live' ? '<span class="cnt" id="liveCnt">0</span>' : ''}</a>`).join('');
   const bn = [['overview', 'dash'], ['live', 'pulse'], ['visitors', 'users'], ['controls', 'sliders']].map(([p, i]) => `<a data-act="nav" data-page="${p}" class="${S.page === p ? 'on' : ''}">${ic(i)}<span>${t('nav_' + p)}</span>${p === 'live' ? '<em class="cnt" id="liveCnt2">0</em>' : ''}</a>`).join('') + `<a data-act="menu">${ic('menu')}<span>${t('nav_more')}</span></a>`;
-  root.innerHTML = `<div class="app"><aside class="side"><div class="brand"><img src="worker/icon-192.png" alt=""><div><b>NOVIX</b><small>${t('app')}</small></div></div><nav class="nav">${nav}</nav>
-    <div class="side-foot"><div class="me" data-act="nav" data-page="settings" style="cursor:pointer"><span class="av">${u.photoURL ? `<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" alt="">` : esc(name.slice(0, 1).toUpperCase())}</span><div><b id="meName">${esc(name)}</b><small>${esc(u.email || '')}</small></div></div><button class="btn" data-act="signout">${ic('logout')}${t('signout')}</button></div></aside>
+  root.innerHTML = `<div class="app"><aside class="side"><div class="brand"><img src="../assets/img/novix-icon-256.png" alt=""><div><b>NOVIX</b><small>${t('app')}</small></div></div><nav class="nav">${nav}</nav>
+    <div class="side-foot"><div class="me" data-act="nav" data-page="settings" style="cursor:pointer"><span class="av" id="meAv">${myAvatar() ? `<img src="${esc(myAvatar())}" referrerpolicy="no-referrer" alt="">` : esc(name.slice(0, 1).toUpperCase())}</span><div><b id="meName">${esc(name)}</b><small>${esc(u.email || '')}</small></div></div><button class="btn" data-act="signout">${ic('logout')}${t('signout')}</button></div></aside>
     <main class="main"><div class="top"><button class="ib menu-btn" data-act="menu">${ic('menu')}</button><div class="grow"><h1 id="ttl"></h1><p id="sub"></p></div><div class="tools" id="tools"></div></div><div id="err"></div><div id="page"></div></main><nav class="bnav">${bn}</nav></div>`;
   head(); renderPage(false);
 }
@@ -935,6 +957,8 @@ document.addEventListener('click', async e => {
     case 'vclear': askClearVisitors(); break;
     case 'install': await installApp(); break;
     case 'json': download('novix-visitors.json', JSON.stringify(S.visitors, null, 2), 'application/json'); break;
+    case 'avpick': { const inp = $('#avInput'); if (inp) inp.click(); break; }
+    case 'avrm': { try { localStorage.removeItem('nx.admin.myavatar'); } catch (x) {} if (S.page === 'settings') renderPage(true); else head(); const av = $('#meAv'); if (av) av.innerHTML = esc(myName().slice(0, 1).toUpperCase()); toast(t('done')); break; }
     case 'admrm': modal({ title: t('t_remove'), hint: d.email, ok: t('t_remove'), danger: true, onOk: async () => { await S.B.removeAdmin(d.email); toast(t('done')); } }); break;
     case 'updall': modal({ title: t('ctl_upd_all'), hint: t('ctl_upd_all_hint'), ok: t('ctl_upd_all'), onOk: async () => { await S.B.setControl('config', { forceUpdAll: { id: String(Date.now()) } }); toast(t('push_sent')); } }); break;
     case 'updlock': { const cur = !!(S.control['d_' + d.id] || {}).updLock; try { await S.B.setControl('d_' + d.id, { updLock: !cur }); toast(t(cur ? 'upd_allowed' : 'upd_paused')); } catch (x) { toast(t('failed'), 'bad'); } break; }
@@ -952,6 +976,17 @@ document.addEventListener('change', async e => {
   else if (el.id === 'vs') { S.vs = el.value; renderTbl(); }
   else if (el.id === 'limSel') { S.limit = +el.value; ls('nx.admin.limit', S.limit); watch(); toast(t('saved')); }
   else if (el.id === 'offAllOn') { el.checked = !el.checked; askOfflineAll(); }
+  else if (el.id === 'avInput') {
+    const file = el.files && el.files[0]; el.value = ''; if (!file) return;
+    if (!/^image\//.test(file.type)) return toast(t('failed'), 'bad');
+    try {
+      const dataUrl = await resizeAvatar(file);
+      ls('nx.admin.myavatar', dataUrl);
+      const meAv = $('#meAv'); if (meAv) meAv.innerHTML = `<img src="${esc(dataUrl)}" alt="">`;
+      if (S.page === 'settings') renderPage(true);
+      toast(t('saved'));
+    } catch (x) { console.error(x); toast(t('failed'), 'bad'); }
+  }
   else if (el.id === 'maintOn' || el.id === 'trackOn' || el.id === 'annOn') {
     const patch = el.id === 'maintOn' ? { maint: el.checked } : el.id === 'trackOn' ? { track: el.checked } : { annOn: el.checked, annId: String(Date.now()) };
     try { await S.B.setControl('config', patch); toast(t('saved')); } catch (x) { el.checked = !el.checked; toast(t('failed'), 'bad'); }
