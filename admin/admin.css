@@ -3,7 +3,7 @@
   --line: rgba(130, 235, 215, .1); --line2: rgba(130, 235, 215, .2);
   --text: #eaf7f3; --muted: #8db0a8; --acc: #2ee6c5; --acc2: #6aa8ff; --acc3: #a98bff; --pink: #ff8fb8;
   --warn: #ffc857; --bad: #ff7d6e; --ok: #3fe0a0; --shadow: 0 20px 50px -24px rgba(0, 0, 0, .75);
-  --r: 22px; --side: 272px; --blob: .5;
+  --pad: clamp(12px, 1.5vw, 22px); --r: 22px; --side: 272px; --blob: .5;
   --font: Alexandria, Manrope, system-ui, "Segoe UI", Tahoma, sans-serif;
 }
 :root[data-theme="light"] {
@@ -48,8 +48,8 @@ html[dir="rtl"] .nav a:hover { transform: translateX(3px); }
 .me .av img { width: 100%; height: 100%; object-fit: cover; }
 .me div { min-width: 0; } .me b { display: block; font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } .me small { color: var(--muted); font-size: 11px; display: block; overflow: hidden; text-overflow: ellipsis; }
 
-.main { min-width: 0; padding: 0 clamp(12px, 1.5vw, 22px) 60px; }
-.top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; padding: 18px 0 14px; margin-bottom: 6px; background: linear-gradient(color-mix(in srgb, var(--bg) 94%, transparent) 65%, transparent); backdrop-filter: blur(10px); }
+.main { min-width: 0; padding: 0 var(--pad) 60px; }
+.top { position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 12px; margin: 0 calc(var(--pad) * -1) 16px; padding: 14px var(--pad); background: color-mix(in srgb, var(--solid) 80%, transparent); border-bottom: 1px solid var(--line); backdrop-filter: blur(18px) saturate(1.3); }
 .top h1 { margin: 0; font-size: clamp(21px, 2.4vw, 28px); font-weight: 800; letter-spacing: -.01em; }
 .top p { margin: 2px 0 0; color: var(--muted); font-size: 13px; }
 .top .grow { flex: 1; min-width: 0; }
@@ -320,7 +320,7 @@ html[dir="rtl"] .toast { transform: translateX(50%); }
   .bnav .cnt { position: absolute; top: 2px; inset-inline-end: 22%; margin: 0; padding: 0 6px; font-size: 10px; }
   .toast { bottom: 96px; }
   .hero { padding: 20px; } .hero-r { width: 100%; justify-content: space-between; }
-  .top { position: static; flex-wrap: wrap; padding-bottom: 6px; background: none; backdrop-filter: none; }
+  .top { position: static; flex-wrap: wrap; padding-bottom: 10px; }
   .tools { order: 3; width: 100%; flex-wrap: nowrap; overflow-x: auto; justify-content: flex-start; padding-bottom: 4px; scrollbar-width: none; } .tools::-webkit-scrollbar { display: none; }
   .tools > * { flex: none; }
   .hero-a .btn { flex: 1; padding: 9px 8px; }
