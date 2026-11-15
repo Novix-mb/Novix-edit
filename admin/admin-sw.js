@@ -1,6 +1,6 @@
-const CACHE = 'novix-admin-v2';
+const CACHE = 'novix-admin-v3';
 const SHELL = ['./', './index.html', './admin.css', './admin.js', './data.js', './i18n.js', './manifest.webmanifest',
-  './worker/icon-192.png', './worker/icon-512.png', '../assets/js/nx-config.js', '../assets/css/fonts.css', '../assets/img/novix-icon-64.png'];
+  './worker/icon-192.png', './worker/icon-512.png', '../assets/js/nx-config.js', '../assets/css/fonts.css', './worker/icon.svg', './worker/favicon-32.png'];
 self.addEventListener('install', e => {
   e.waitUntil(caches.open(CACHE).then(c => Promise.allSettled(SHELL.map(u => c.add(u)))).then(() => self.skipWaiting()));
 });
