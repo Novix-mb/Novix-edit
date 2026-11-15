@@ -257,3 +257,25 @@ html[dir="rtl"] .toast { transform: translateX(50%); }
 .vfeedbox { width: min(520px, 100%) !important; }
 .vm .dh .btn.sm { white-space: nowrap; }
 @media (max-width: 520px) { .vm .vhead { padding: 18px 16px 0; } .vm .vbody { padding: 4px 16px 20px; } .vm .dh .btn.sm { font-size: 0; gap: 0; padding: 8px; } .vm .dh .btn.sm svg { width: 18px; height: 18px; } }
+
+/* ===== فك الحظر بنفس الأيقونة، حذف الأنشطة، عرض بيانات المستخدم ===== */
+.btn.bad.on { background: color-mix(in srgb, var(--bad) 24%, var(--card2)); border-color: var(--bad); }
+.btn.armed { background: var(--bad); color: #fff; border-color: var(--bad); }
+.evx { width: 30px; height: 30px; border-radius: 9px; flex: none; color: var(--bad); }
+.evx svg { width: 15px; height: 15px; }
+.pullst { display: flex; gap: 10px; align-items: center; padding: 12px 14px; border-radius: 14px; background: var(--card2); border: 1px solid var(--line); }
+.pullst b { display: block; font-size: 13px; } .pullst small { color: var(--muted); }
+.vdatabox .vtabs { overflow-x: auto; flex-wrap: nowrap; } .vdatabox .vtabs button { white-space: nowrap; } .vdatabox .vtabs small { opacity: .7; margin-inline-start: 4px; }
+.dvhead { display: flex; align-items: center; justify-content: space-between; gap: 8px; margin: 6px 0 12px; }
+.dvr { display: flex; gap: 10px; align-items: flex-start; padding: 11px 12px; border-radius: 13px; background: var(--card2); border: 1px solid var(--line); margin-bottom: 8px; }
+.dvr.editing { flex-direction: column; align-items: stretch; border-color: var(--acc); }
+.dvr .row-act { flex: none; align-items: center; flex-wrap: wrap; }
+.dvmain { flex: 1; min-width: 0; }
+.dvmain b { display: block; font-size: 13.5px; word-break: break-word; }
+.dvmain b.dn { text-decoration: line-through; opacity: .6; }
+.dvmain small { display: block; color: var(--muted); font-size: 12px; margin-top: 3px; white-space: pre-wrap; word-break: break-word; }
+.dvchk { width: 20px; height: 20px; border-radius: 7px; border: 2px solid var(--line); flex: none; display: grid; place-items: center; margin-top: 1px; }
+.dvchk.on { background: var(--ok); border-color: var(--ok); color: #052420; } .dvchk svg { width: 12px; height: 12px; }
+.dvform { display: flex; flex-direction: column; gap: 8px; } .dvform > label, .dvgrid label:not(.chk) { font-size: 12px; color: var(--muted); }
+.dvgrid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; align-items: end; }
+@media (max-width: 520px) { .dvr:not(.editing) { flex-wrap: wrap; } .dvr:not(.editing) .row-act { width: 100%; justify-content: flex-start; } }
