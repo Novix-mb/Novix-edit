@@ -158,6 +158,7 @@ export const L = {
     less: 'أقل', more: 'أكثر', other: 'أخرى', v_bulk: 'إجراءات جماعية', nav_more: 'المزيد', fl_on: 'مفعّل', fl_off: 'معطّل',
     set_profile: 'الملف الشخصي', set_name: 'اسم الأدمن', set_name_ph: 'اكتب اسمك', set_name_sub: 'يظهر في الشريط الجانبي والترحيب وقائمة الفريق.',
     set_bulk: 'إجراءات جماعية', set_bulk_sub: 'تؤثر على كل الزوار — استخدمها بحذر.', set_all_hint: 'يحذف كل الزوار مع جلساتهم وأحداثهم نهائياً.',
+    upd_ready: 'يتوفر إصدار جديد من اللوحة', upd_now: 'تحديث الآن',
   },
   en: {
     app: 'Admin Console', brand: 'NOVIX',
@@ -318,5 +319,6 @@ export const L = {
     less: 'Less', more: 'More', other: 'Other', v_bulk: 'Bulk actions', nav_more: 'More', fl_on: 'On', fl_off: 'Off',
     set_profile: 'Profile', set_name: 'Admin name', set_name_ph: 'Your name', set_name_sub: 'Shown in the sidebar, the greeting and the team list.',
     set_bulk: 'Bulk actions', set_bulk_sub: 'These affect every visitor — use with care.', set_all_hint: 'Permanently deletes all visitors with their sessions and events.',
+    upd_ready: 'A new version of the panel is available', upd_now: 'Update now',
   }
 };

@@ -351,3 +351,7 @@ html[dir="rtl"] .toast { transform: translateX(50%); }
 .brow .ic { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; background: color-mix(in srgb, var(--c) 15%, transparent); color: var(--c); flex: none; }
 .brow > div { flex: 1; min-width: 0; } .brow b { display: block; font-size: 13.5px; } .brow small { display: block; color: var(--muted); font-size: 12px; line-height: 1.5; }
 @media (max-width: 520px) { .brow { flex-wrap: wrap; } .brow .btn { width: 100%; } }
+
+.updbar { position: fixed; z-index: 95; top: 14px; inset-inline-start: 50%; transform: translateX(-50%); display: flex; align-items: center; gap: 12px; padding: 9px 12px 9px 16px; border-radius: 99px; background: var(--solid); border: 1px solid var(--acc); box-shadow: 0 16px 40px -14px var(--acc); font-weight: 600; font-size: 13px; animation: rise .35s both; max-width: calc(100vw - 24px); }
+html[dir="rtl"] .updbar { transform: translateX(50%); }
+.updbar svg { color: var(--acc); }

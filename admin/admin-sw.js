@@ -1,4 +1,4 @@
-const CACHE = 'novix-admin-v3';
+const CACHE = 'novix-admin';
 const SHELL = ['./', './index.html', './admin.css', './admin.js', './data.js', './i18n.js', './manifest.webmanifest',
   './worker/icon-192.png', './worker/icon-512.png', '../assets/js/nx-config.js', '../assets/css/fonts.css', './worker/icon.svg', './worker/favicon-32.png'];
 self.addEventListener('install', e => {
@@ -10,7 +10,7 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const r = e.request, u = new URL(r.url);
   if (r.method !== 'GET' || u.origin !== location.origin || u.pathname.includes('/__/')) return;
-  e.respondWith(fetch(r).then(res => {
+  e.respondWith(fetch(r, { cache: 'no-cache' }).then(res => {
     if (res && res.ok) { const cp = res.clone(); caches.open(CACHE).then(c => c.put(r, cp)).catch(() => {}); }
     return res;
   }).catch(() => caches.match(r).then(m => m || (r.mode === 'navigate' ? caches.match('./index.html') : Response.error()))));

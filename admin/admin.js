@@ -520,7 +520,7 @@ function vUpd(id) {
     <small class="vhint">${obDev ? t('d_offline_blocked_hint') : t('d_offline_hint')}</small>`;
 }
 function offlineBtns(id, ob) {
-  return `<button class="btn ${ob ? 'bad' : ''}" data-act="voffline" data-id="${esc(id)}">${ic(ob ? 'wifi-off' : 'wifi')}${ob ? t('a_offline_unblock') : t('a_offline_block')}</button><button class="btn" data-act="vofflineall">${ic('wifi-off')}${t('a_offline_all')}</button>`;
+  return `<button class="btn ${ob ? 'bad' : ''}" data-act="voffline" data-id="${esc(id)}">${ic(ob ? 'wifi-off' : 'wifi')}${ob ? t('a_offline_unblock') : t('a_offline_block')}</button>`;
 }
 function vActs(id) {
   const v = findVisitor(id), devBan = banActive(S.control['d_' + id]), ipBan = !!(v.ip && banActive(S.control[ipKey(v.ip)]));
@@ -850,6 +850,7 @@ document.addEventListener('click', async e => {
   const a = el.dataset.act, d = el.dataset;
   if (el.tagName === 'TR' && e.target.closest('button')) return;
   switch (a) {
+    case 'reload': try { const ks = await caches.keys(); await Promise.all(ks.filter(k => k.startsWith('novix-admin')).map(k => caches.delete(k))); } catch (x) {} location.reload(); break;
     case 'nav': go(d.page); break;
     case 'vfset': S.vf = d.v; S.vShow = 50; renderTbl(); break;
     case 'menu': document.body.classList.toggle('nav-open'); break;
@@ -1045,6 +1046,33 @@ function showDeny(u) {
   $('#sob').onclick = () => S.B.signOut();
 }
 
+const WATCHED = ['index.html', 'admin.js', 'admin.css', 'data.js', 'i18n.js'];
+const hashStr = s => { let h = 5381; for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0; return h; };
+let updBase = null, updShown = false;
+async function fingerprint() {
+  const parts = await Promise.all(WATCHED.map(async f => { const r = await fetch(f + '?t=' + Date.now(), { cache: 'no-store' }); if (!r.ok) throw new Error(f); return hashStr(await r.text()); }));
+  return parts.join('.');
+}
+async function checkUpdate() {
+  if (updShown || document.hidden) return;
+  try {
+    const fp = await fingerprint();
+    if (updBase === null) { updBase = fp; return; }
+    if (fp !== updBase) showUpdateBar();
+  } catch (e) {}
+}
+function showUpdateBar() {
+  updShown = true;
+  const d = document.createElement('div'); d.className = 'updbar';
+  d.innerHTML = `${ic('refresh')}<span>${esc(t('upd_ready'))}</span><button class="btn sm pri" data-act="reload">${esc(t('upd_now'))}</button>`;
+  document.body.appendChild(d);
+}
+function watchUpdates() {
+  checkUpdate();
+  setInterval(checkUpdate, 3 * 60 * 1000);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) checkUpdate(); });
+}
+
 async function boot() {
   applyLang();
   S.demo = params.has('demo');
@@ -1055,7 +1083,8 @@ async function boot() {
     if (!u) { S.user = null; return showLogin(); }
     if (!(await S.B.isAdmin(u.email || ''))) return showDeny(u);
     S.user = u; if (!S.demo) ls('nx.admin', '1');
-    startApp();
+    startApp(); watchUpdates();
   });
 }
 boot();
+
