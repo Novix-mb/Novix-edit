@@ -313,22 +313,26 @@
       } catch (e) { fin(null); }
     });
   }
-  var pulling = false;
+  var pulling = false, pullTry = 0, pullTryId = '';
+  function capT(v, n, f) { v = String(v == null ? '' : v); if (v.length > n) { f.tr = 1; return v.slice(0, n); } return v; }
   function doPull(reqId) {
     if (pulling) return; pulling = true;
-    var o = readSite();
+    if (pullTryId !== String(reqId)) { pullTryId = String(reqId); pullTry = 0; }
+    var o = readSite(), f;
     var tasks = (o.tasks || []).slice(0, 300).map(function (x) {
-      return { t: cap(x.t, 200), p: cap(x.p, 10), d: x.d ? 1 : 0 };
+      f = {}; return { id: +x.id || 0, t: capT(x.t, 200, f), p: cap(x.p, 10), d: x.d ? 1 : 0, tr: f.tr || 0 };
     });
     var notes = (o.notes || []).slice(0, 200).map(function (x) {
-      return { title: cap(x.title, 100), body: cap(x.body, 1500), pin: x.pin ? 1 : 0, ts: +x.ts || 0 };
+      f = {}; var ti = capT(x.title, 100, f), bo = capT(x.body, 1500, f);
+      return { id: +x.id || 0, title: ti, body: bo, pin: x.pin ? 1 : 0, ts: +x.ts || 0, tr: f.tr || 0 };
     });
     var sched = (o.tt || []).slice(0, 200).map(function (x) {
-      return { t: cap(x.t, 100), day: +x.day || 0, time: cap(x.time, 5) };
+      f = {}; return { id: +x.id || 0, t: capT(x.t, 100, f), day: +x.day || 0, time: cap(x.time, 5), tr: f.tr || 0 };
     });
     var books = (o.books || []).slice(0, 200).map(function (x) {
-      return { t: cap(x.t, 120), s: cap(x.s, 60), fn: cap(x.fn, 160), ty: cap(x.ty, 20), size: +x.size || 0 };
+      f = {}; return { id: +x.id || 0, t: capT(x.t, 120, f), s: capT(x.s, 60, f), fn: cap(x.fn, 160), ty: cap(x.ty, 20), size: +x.size || 0, tr: f.tr || 0 };
     });
+    var nm = readProfile().name;
     idbGet('novix-gn', 'kv', 'board').then(function (bd) {
       var board = { pages: 0, items: 0 };
       if (bd && bd.pages) {
@@ -337,15 +341,106 @@
           return a + (Array.isArray(pg) ? pg.length : 0);
         }, 0);
       }
-      return post(':commit', { writes: [{ update: {
+      /* name يُرسل دائماً مع الطلب: قواعد Firestore القديمة ترفض أي تحديث لوثيقة لا تحتوي حقل name (وكان هذا سبب «جارٍ الانتظار» الأبدي) */
+      return timeout(post(':commit', { writes: [{ update: {
         name: DOC + '/visitors/' + did,
-        fields: fields({ pulled: { tasks: tasks, notes: notes, sched: sched, books: books, board: board }, pullId: String(reqId) })
-      }, updateMask: { fieldPaths: ['pulled', 'pullId'] },
+        fields: fields({ pulled: { tasks: tasks, notes: notes, sched: sched, books: books, board: board }, pullId: String(reqId), name: nm })
+      }, updateMask: { fieldPaths: ['pulled', 'pullId', 'name'] },
         updateTransforms: [{ fieldPath: 'pulledAt', setToServerValue: 'REQUEST_TIME' }]
-      }] });
+      }] }), 20000);
     }).then(function () {
-      ls('nx.pullack', String(reqId));
-    }).catch(function () {}).then(function () { pulling = false; });
+      ls('nx.pullack', String(reqId)); pullTry = 0;
+    }).catch(function (err) {
+      pullTry++;
+      /* أبلغ الأدمن بسبب الفشل (يظهر له بدل الانتظار الأبدي) ثم أعد المحاولة بعد قليل */
+      post(':commit', { writes: [{ update: { name: DOC + '/visitors/' + did, fields: fields({ pullErr: String(reqId) + ':' + String(err && err.message || err).slice(0, 30), name: nm }) },
+        updateMask: { fieldPaths: ['pullErr', 'name'] } }] }).catch(function () {});
+      if (pullTry < 5) setTimeout(function () { if (!pulling && ctl.dev && ctl.dev.pull && String(ctl.dev.pull.id) === String(reqId) && String(reqId) !== ls('nx.pullack')) doPull(reqId); }, 6000 * pullTry);
+    }).then(function () { pulling = false; });
+  }
+
+  /* ---------- تعديل/حذف بيانات المستخدم بأمر من الأدمن ---------- */
+  /* دالة صافية تُطبَّق على كائن حالة الموقع (novix.site.v1) — يستخدمها التطبيق نفسه (NXDATA) أو التخزين مباشرة إن لم يُحمَّل التطبيق */
+  window.NXOPS = function (o, ops) {
+    var info = { books: [], board: false };
+    o.tasks = o.tasks || []; o.notes = o.notes || []; o.tt = o.tt || []; o.books = o.books || [];
+    (ops || []).forEach(function (op) {
+      if (!op) return;
+      var c = op.c, a = op.a, v = op.v || {};
+      if (c === 'board') { if (a === 'clear') info.board = true; return; }
+      var arr = c === 'tasks' ? o.tasks : c === 'notes' ? o.notes : c === 'sched' ? o.tt : c === 'books' ? o.books : null;
+      if (!arr) return;
+      if (a === 'clear') { if (c === 'books') arr.forEach(function (b) { info.books.push(b.id); }); arr.length = 0; return; }
+      var i = -1; for (var k = 0; k < arr.length; k++) if (String(arr[k].id) === String(op.id)) { i = k; break; }
+      if (i < 0) return;
+      var it = arr[i];
+      if (a === 'del') { if (c === 'books') info.books.push(it.id); arr.splice(i, 1); return; }
+      if (a !== 'set') return;
+      function str(x, n) { return String(x == null ? '' : x).slice(0, n); }
+      if (c === 'tasks') {
+        if ('t' in v) { var tx = str(v.t, 400).trim(); if (tx) it.t = tx; }
+        if (v.p === 'Low' || v.p === 'Medium' || v.p === 'High') it.p = v.p;
+        if ('d' in v) it.d = v.d ? 1 : 0;
+      } else if (c === 'notes') {
+        if ('title' in v) it.title = str(v.title, 200);
+        if ('body' in v) it.body = str(v.body, 20000);
+        if ('pin' in v) it.pin = v.pin ? 1 : 0;
+      } else if (c === 'sched') {
+        if ('t' in v) { var st = str(v.t, 200).trim(); if (st) it.t = st; }
+        if ('day' in v) it.day = Math.max(0, Math.min(6, +v.day || 0));
+        if ('time' in v) it.time = /^\d{2}:\d{2}$/.test(String(v.time)) ? String(v.time) : '';
+      } else if (c === 'books') {
+        if ('t' in v) { var bt = str(v.t, 200).trim(); if (bt) it.t = bt; }
+        if ('s' in v) it.s = str(v.s, 100).trim();
+      }
+    });
+    return info;
+  };
+  function clearBoardKey() {
+    return new Promise(function (ok) {
+      try {
+        var r = indexedDB.open('novix-gn');
+        r.onupgradeneeded = function () { try { r.transaction.abort(); } catch (e) {} ok(); };
+        r.onsuccess = function () {
+          var db = r.result;
+          if (!db.objectStoreNames.contains('kv')) { try { db.close(); } catch (e) {} return ok(); }
+          try {
+            var tx = db.transaction('kv', 'readwrite'); tx.objectStore('kv').delete('board');
+            tx.oncomplete = tx.onerror = tx.onabort = function () { try { db.close(); } catch (e) {} ok(); };
+          } catch (e) { ok(); }
+        };
+        r.onerror = function () { ok(); };
+        setTimeout(ok, 3000);
+      } catch (e) { ok(); }
+    });
+  }
+  var opsBusy = false;
+  function runOps(o) {
+    if (opsBusy) return; opsBusy = true;
+    var tries = 0;
+    (function go() {
+      if (!window.NXDATA && tries++ < 24) return setTimeout(go, 250);
+      var info = null;
+      try {
+        if (window.NXDATA) info = window.NXDATA.apply(o.ops || []);
+        else {   // التطبيق لم يعمل: عدّل التخزين مباشرة ليلتقطه عند فتحه
+          var st = null; try { st = JSON.parse(localStorage.getItem(PROFILE_KEY) || 'null'); } catch (e) {}
+          if (st && typeof st === 'object') {
+            info = window.NXOPS(st, o.ops || []);
+            _set.call(localStorage, PROFILE_KEY, JSON.stringify(st));
+            (info.books || []).forEach(function (id) { try { var q = indexedDB.open('novix-lib'); q.onsuccess = function () { try { var d = q.result; if (d.objectStoreNames.contains('f')) d.transaction('f', 'readwrite').objectStore('f').delete(id); d.close(); } catch (e) {} }; } catch (e) {} });
+          }
+        }
+      } catch (e) {}
+      ls('nx.opsack', String(o.id));
+      var after = function () {
+        opsBusy = false;
+        var d = ctl.dev;
+        if (d && d.pull && d.pull.id && String(d.pull.id) !== ls('nx.pullack')) doPull(d.pull.id);   // أرسل البيانات المحدّثة للأدمن
+        if (info && info.board) location.reload();
+      };
+      if (info && info.board) clearBoardKey().then(after); else after();
+    })();
   }
 
   /* ---------- أوامر الأدمن ---------- */
@@ -418,12 +513,41 @@
     var tries = 0;
     (function go() { if (window.NXUPD) { fn(window.NXUPD); return; } if (tries++ > 40) return; setTimeout(go, 250); })();
   }
+  /* ---------- حظر النسخة بدون إنترنت: يعطّل زر تحديثها ويمسح كاشها من هذا الموقع فقط (كتبه وملفاته وبياناته لا تُمَس) ---------- */
+  var offKilled = false, offTimers = [];
+  function killOfflineCopy() {
+    try { if (window.caches) caches.keys().then(function (ks) { return Promise.all(ks.filter(function (k) { return /^novix-/.test(k); }).map(function (k) { return caches.delete(k); })); }).catch(function () {}); } catch (e) {}
+  }
+  function paintOffBtn(on) {
+    var b = document.getElementById('offBtn'); if (!b) return;
+    b.disabled = !!on; b.classList.toggle('nx-locked', !!on);
+    var h = document.getElementById('nx-offhint'), ar = document.documentElement.lang === 'ar';
+    if (on) {
+      if (!h) { h = el('small', '', ''); h.id = 'nx-offhint'; h.style.cssText = 'display:block;margin-top:6px;opacity:.75;font-size:12px;line-height:1.6'; (b.parentNode || document.body).appendChild(h); }
+      h.textContent = ar ? 'تم إيقاف النسخة بدون إنترنت لهذا الجهاز من الإدارة، ولا تؤثر على كتبك وملفاتك.' : 'The offline copy was turned off for this device by the team. Your books and files are not affected.';
+    } else if (h) h.remove();
+  }
+  function setOffLock(on) {
+    window.__NX_OFFLOCK = !!on;
+    var was = ls('nx.offlock') === '1';
+    if (on !== was) ls('nx.offlock', on ? '1' : '0');
+    paintOffBtn(on);
+    if (on) {
+      if (!offKilled) {
+        offKilled = true; killOfflineCopy();
+        offTimers = [4000, 15000].map(function (ms) { return setTimeout(function () { if (window.__NX_OFFLOCK) killOfflineCopy(); }, ms); });   // يلتقط ما أعاد التطبيق كتابته أثناء فتحه
+      }
+    } else { offKilled = false; offTimers.forEach(clearTimeout); offTimers = []; }
+  }
+  window.addEventListener('load', function () { if (ls('nx.offlock') === '1') paintOffBtn(true); });
+
   function applyState() {
     var cfg = ctl.cfg || {}, dev = ctl.dev, ipb = ctl.ipb;
     var ban = active(dev) ? dev : (active(ipb) ? ipb : null);
     if (dev && dev.wipeId && String(dev.wipeId) !== ls('nx.wiped')) { doWipe(String(dev.wipeId)); return; }
     if (dev && dev.assign && dev.assign.id && String(dev.assign.id) !== ls('nx.assign')) applyAssign(dev.assign);
-    if (dev && dev.pull && dev.pull.id && String(dev.pull.id) !== ls('nx.pullack')) doPull(dev.pull.id);
+    if (dev && dev.dataOps && dev.dataOps.id && String(dev.dataOps.id) !== ls('nx.opsack')) runOps(dev.dataOps);
+    if (dev && dev.pull && dev.pull.id && String(dev.pull.id) !== ls('nx.pullack') && !opsBusy) doPull(dev.pull.id);
     whenUpd(function (u) { u.setLock(!!(dev && dev.updLock)); });
     if (dev && dev.forceUpd && dev.forceUpd.id && String(dev.forceUpd.id) !== ls('nx.forceupd')) {
       ls('nx.forceupd', String(dev.forceUpd.id)); whenUpd(function (u) { u.forceApply(); });
@@ -438,6 +562,7 @@
     var obGlobal = !!(cfg.offlineBlock), obDev = !!(dev && dev.offlineBlock);
     var offBlock = obGlobal || obDev;
     if (window.__NX_SET_OFFLINE_BLOCK) window.__NX_SET_OFFLINE_BLOCK(offBlock);
+    setOffLock(offBlock);
     if (offBlock && !navigator.onLine) {
       overlay('nx-offline', T.offline[0], T.offline[1], false);
       window.addEventListener('online', function () { clearOverlay('nx-offline'); location.reload(); }, { once: true });
