@@ -89,8 +89,9 @@
     };
     const fetchBlob = async src => {
         let cache = null;
+        const locked = (() => { try { return localStorage.getItem('nx.offlock') === '1'; } catch (e) { return false; } })();
         try {
-            cache = await caches.open(MEDIA);
+            if (!locked) cache = await caches.open(MEDIA);
         } catch (e) {}
         let res = cache && await cache.match(src);
         if (!res) {
