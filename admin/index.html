@@ -8,19 +8,17 @@
   <title>NOVIX Admin</title>
   <link rel="icon" href="../assets/img/favicon.ico">
   <link rel="manifest" href="manifest.webmanifest">
-  <link rel="apple-touch-icon" href="icon-192.png">
+  <link rel="apple-touch-icon" href="worker/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-title" content="NOVIX Admin">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <script>
-    /* تطبيق المظهر واللغة قبل الرسم لتجنب الوميض */
     try {
       var t = localStorage.getItem('nx.admin.theme'), l = localStorage.getItem('nx.admin.lang') || 'ar';
       if (t) document.documentElement.dataset.theme = t;
       document.documentElement.lang = l; document.documentElement.dir = l === 'ar' ? 'rtl' : 'ltr';
     } catch (e) {}
-    /* التقاط حدث التثبيت مبكراً ليستخدمه زر «تثبيت التطبيق» */
     window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); window.__nxIP = e; window.dispatchEvent(new Event('nx-installable')); });
   </script>
   <link rel="stylesheet" href="../assets/css/fonts.css" media="print" onload="this.media='all'">
@@ -28,6 +26,7 @@
   <script src="../assets/js/nx-config.js"></script>
 </head>
 <body>
+  <div class="aurora"><i></i><i></i><i></i></div>
   <div id="root"><div class="gate"><div class="spin"></div></div></div>
   <script type="module" src="admin.js"></script>
 </body>

@@ -152,6 +152,10 @@ export const L = {
     dv_pages: 'صفحات',
     dv_items: 'عناصر',
     dv_fetched: 'آخر جلب',
+    g_night: 'سهرة موفقة', g_morning: 'صباح الخير', g_noon: 'يومك سعيد', g_evening: 'مساء الخير',
+    hero_sub: '{n} متصل الآن · {m} زيارة اليوم', hero_maint: 'وضع الصيانة مفعّل', hero_ann: 'شريط الإعلان ظاهر', hero_notrack: 'التتبع متوقف',
+    vs_prev: 'مقارنة بالفترة السابقة', vs_prev_b: 'عن السابق', k_peak: 'الذروة', k_avgb: 'المتوسط', k_totalv: 'الإجمالي', per_h: 'في الساعة', per_d: 'في اليوم',
+    less: 'أقل', more: 'أكثر', other: 'أخرى', v_bulk: 'إجراءات جماعية', nav_more: 'المزيد', fl_on: 'مفعّل', fl_off: 'معطّل',
   },
   en: {
     app: 'Admin Console', brand: 'NOVIX',
@@ -306,5 +310,9 @@ export const L = {
     dv_pages: 'pages',
     dv_items: 'items',
     dv_fetched: 'Last fetched',
+    g_night: 'Working late', g_morning: 'Good morning', g_noon: 'Good afternoon', g_evening: 'Good evening',
+    hero_sub: '{n} online now · {m} visits today', hero_maint: 'Maintenance mode on', hero_ann: 'Announcement showing', hero_notrack: 'Tracking is off',
+    vs_prev: 'vs previous period', vs_prev_b: 'vs previous', k_peak: 'Peak', k_avgb: 'Average', k_totalv: 'Total', per_h: 'per hour', per_d: 'per day',
+    less: 'Less', more: 'More', other: 'Other', v_bulk: 'Bulk actions', nav_more: 'More', fl_on: 'On', fl_off: 'Off',
   }
 };

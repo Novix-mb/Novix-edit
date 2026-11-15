@@ -61,9 +61,13 @@ const IC = {
   'wifi-off': '<path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
   alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'
 };
+Object.assign(IC, {
+  up: '<path d="M7 17 17 7M7 7h10v10"/>', down: '<path d="M7 7l10 10M17 7v10H7"/>',
+  dots: '<circle cx="5" cy="12" r="1.4"/><circle cx="12" cy="12" r="1.4"/><circle cx="19" cy="12" r="1.4"/>'
+});
 const ic = n => `<svg class="i" viewBox="0 0 24 24">${IC[n] || ''}</svg>`;
 const devIc = d => ic(d === 'mobile' ? 'phone' : d === 'tablet' ? 'tablet' : 'monitor');
-/* صورة واسم المستخدم كما يراها هو في الموقع */
+
 const vis = id => S.visitors.find(v => v.id === id);
 const vName = (id, v) => ((v || vis(id) || {}).name || '').trim();
 const avt = (id, dev, size = 36) => { const v = vis(id); return v && v.photo ? `<img class="avt" style="width:${size}px;height:${size}px" src="${esc(v.photo)}" alt="">` : `<span class="ico" style="width:${size}px;height:${size}px">${devIc(dev || (v && v.device))}</span>`; };
@@ -80,13 +84,13 @@ function evText(e) {
   if (e.type === 'show') return t('ev_show');
   return e.type;
 }
-const evRow = (e, who, del) => `<div class="evr">${avt(e.deviceId, null, 30)}<div><b>${who ? esc(vName(e.deviceId) || short(e.deviceId)) : ''}</b><span>${esc(evText(e))}</span></div><small>${ago(e.at)}</small>${del ? `<button class="ib evx" data-act="evdel" data-id="${esc(e.id)}" title="${esc(t('f_del'))}">${ic('trash')}</button>` : ''}</div>`;
+const evIc = e => e.type === 'view' ? ['eye', '--acc2'] : e.type === 'open' ? ['users', '--acc'] : e.type === 'act' ? ['bolt', '--warn'] : e.type === 'hide' ? ['moon', '--muted'] : ['sun', '--ok'];
+const evRow = (e, who, del) => { const [i, c] = evIc(e); return `<div class="evr">${who ? avt(e.deviceId, null, 34) : ''}<span class="evic" style="--c:var(${c})">${ic(i)}</span><div><b>${who ? esc(vName(e.deviceId) || short(e.deviceId)) : ''}</b><span>${esc(evText(e))}</span></div><small>${ago(e.at)}</small>${del ? `<button class="ib evx" data-act="evdel" data-id="${esc(e.id)}" title="${esc(t('f_del'))}">${ic('trash')}</button>` : ''}</div>`; };
 function pFeed() {
-  const list = S.events.slice(0, 120);
-  return `<div class="card"><div class="tbar" style="justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">${ic('bolt')} ${t('f_title')}<small>${nf(list.length)}</small></h3>${list.length ? `<button class="btn sm bad" data-act="evclear">${ic('trash')}${t('f_clear_all')}</button>` : ''}</div>${list.length ? `<div class="evl">${list.map(e => evRow(e, true, true)).join('')}</div>` : emptyBox()}</div>`;
+  const list = S.events.slice(0, 120), devs = new Set(list.map(e => e.deviceId)).size;
+  return `<div class="card"><div class="tbar" style="justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">${ic('bolt')} ${t('f_title')}<small>${nf(list.length)}</small></h3>${list.length ? `<button class="btn sm bad" data-act="evclear">${ic('trash')}${t('f_clear_all')}</button>` : ''}</div>${list.length ? `<div class="sumrow"><span><b>${nf(devs)}</b> ${t('th_device')}</span><span>${t('th_last')}: <b>${ago(list[0].at)}</b></span></div><div class="evl">${list.map(e => evRow(e, true, true)).join('')}</div>` : emptyBox()}</div>`;
 }
 
-/* ============================== الحالة ============================== */
 const S = {
   B: null, user: null, demo: false, page: (location.hash || '#overview').slice(1) || 'overview', range: ls('nx.admin.range') || '7d',
   sessions: [], visitors: [], events: [], control: {}, admins: [], counts: null, loaded: false, err: null,
@@ -98,7 +102,6 @@ const hbSec = Math.max(30, Math.min(300, +C.heartbeatSec || 60));
 const onlineThr = () => Math.max(90, hbSec * 1.6) * 1000;
 const root = $('#root');
 
-/* ============================== التحليلات ============================== */
 const cutoff = r => { const n = new Date(); if (r === 'today') { n.setHours(0, 0, 0, 0); return n.getTime(); } if (r === '7d') return Date.now() - 7 * 864e5; if (r === '30d') return Date.now() - 30 * 864e5; return 0; };
 const banActive = o => !!(o && o.banned && (!ms(o.until) || ms(o.until) > Date.now()));
 const isBanned = v => banActive(S.control['d_' + v.id]) || (v.ip && banActive(S.control[ipKey(v.ip)]));
@@ -118,25 +121,27 @@ function calc() {
     return { t: tt, end: tt + (hourly ? 36e5 : 864e5), s: 0, u: new Set() };
   });
   ss.forEach(s => { const b = buckets.find(x => s.start >= x.t && s.start < x.end); if (b) { b.s++; b.u.add(s.deviceId); } });
-  const sum = (key) => { const m = {}; ss.forEach(s => { for (const k in s[key]) m[k] = (m[k] || 0) + s[key][k]; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
-  const cnt = (fn) => { const m = {}; perDev.forEach(o => { const k = fn(o.last) || '—'; m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+  const sum = key => { const m = {}; ss.forEach(s => { for (const k in s[key]) m[k] = (m[k] || 0) + s[key][k]; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
+  const cnt = fn => { const m = {}; perDev.forEach(o => { const k = fn(o.last) || '—'; m[k] = (m[k] || 0) + 1; }); return Object.entries(m).sort((a, b) => b[1] - a[1]); };
   const hours = Array(24).fill(0), wd = Array(7).fill(0), durB = Array(5).fill(0);
   ss.forEach(s => { const d = new Date(s.start); hours[d.getHours()]++; wd[d.getDay()]++; durB[s.secs < 60 ? 0 : s.secs < 300 ? 1 : s.secs < 900 ? 2 : s.secs < 1800 ? 3 : 4]++; });
   const avg = ss.length ? ss.reduce((a, s) => a + s.secs, 0) / ss.length : 0;
+  let prev = null;
+  if (cut > 0 && S.sessions.length) {
+    const p0 = hourly ? cut - 864e5 : cut - (now - cut), p1 = hourly ? now - 864e5 : cut;
+    const minStart = S.sessions.reduce((m, s) => Math.min(m, s.start || m), Infinity);
+    if (S.sessions.length < S.limit || minStart <= p0) {
+      const ps = S.sessions.filter(s => s.start >= p0 && s.start < p1);
+      prev = { n: ps.length, u: new Set(ps.map(s => s.deviceId)).size, avg: ps.length ? ps.reduce((a, s) => a + s.secs, 0) / ps.length : 0 };
+    }
+  }
   return {
-    ss, onlineS, onlineDev, uniq: perDev.size, avg, returning, buckets, hours, wd, durB, hourly,
+    ss, onlineS, onlineDev, uniq: perDev.size, avg, returning, buckets, hours, wd, durB, hourly, prev,
     devices: cnt(s => s.device), countries: cnt(s => s.country), browsers: cnt(s => s.browser), oss: cnt(s => s.os),
     vsecs: sum('vsecs'), views: sum('views'), acts: sum('acts')
   };
 }
 
-/* ============================== مكوّنات الرسم ============================== */
-function spark(vals, color = 'var(--acc)') {
-  const W = 96, H = 38, mx = Math.max(1, ...vals), step = W / Math.max(1, vals.length - 1);
-  const pts = vals.map((v, i) => [i * step, H - 4 - (v / mx) * (H - 10)]);
-  const d = pts.map((p, i) => (i ? 'L' : 'M') + p[0].toFixed(1) + ' ' + p[1].toFixed(1)).join(' ');
-  return `<svg class="sp" viewBox="0 0 ${W} ${H}"><path d="${d}" fill="none" stroke="${color}" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/></svg>`;
-}
 const niceMax = v => { if (v <= 5) return 5; const p = Math.pow(10, Math.floor(Math.log10(v))), f = v / p; return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p; };
 function smooth(pts) {
   if (pts.length < 3) return pts.map((p, i) => (i ? 'L' : 'M') + p[0] + ' ' + p[1]).join(' ');
@@ -148,52 +153,104 @@ function smooth(pts) {
   }
   return d;
 }
+let sparkId = 0;
+function spark(vals, color = 'var(--acc)') {
+  const W = 120, H = 40, n = vals.length, mx = Math.max(1, ...vals);
+  if (n < 2) return '';
+  const pts = vals.map((v, i) => [+(i * W / (n - 1)).toFixed(1), +(H - 5 - (v / mx) * (H - 12)).toFixed(1)]), d = smooth(pts), id = 'sg' + (++sparkId);
+  return `<svg class="sp" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none"><defs><linearGradient id="${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${color}" stop-opacity=".35"/><stop offset="1" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><path d="${d} L${W} ${H} L0 ${H} Z" fill="url(#${id})"/><path d="${d}" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" vector-effect="non-scaling-stroke"/></svg>`;
+}
 function lineChart(bk, hourly) {
-  const W = 720, H = 240, pl = 36, pr = 10, pt = 12, pb = 28, n = bk.length;
-  const mx = niceMax(Math.max(1, ...bk.map(b => b.s))), iw = W - pl - pr, ih = H - pt - pb;
+  const W = 760, H = 270, pl = 40, pr = 14, pt = 26, pb = 30, n = bk.length;
+  const vals = bk.map(b => b.s), mxv = Math.max(1, ...vals), mx = niceMax(mxv), iw = W - pl - pr, ih = H - pt - pb;
   const X = i => pl + (n === 1 ? iw / 2 : i * iw / (n - 1)), Y = v => pt + ih - (v / mx) * ih;
+  const lab = (b, long) => hourly ? new Date(b.t).getHours() + ':00' : new Date(b.t).toLocaleDateString(loc(), long ? { weekday: 'short', month: 'short', day: 'numeric' } : { month: 'short', day: 'numeric' });
   const ps = bk.map((b, i) => [+X(i).toFixed(1), +Y(b.s).toFixed(1)]), pu = bk.map((b, i) => [+X(i).toFixed(1), +Y(b.u.size).toFixed(1)]);
+  const total = vals.reduce((a, b) => a + b, 0), avg = total / n, pk = vals.indexOf(mxv);
   let g = ''; for (let i = 0; i <= 4; i++) { const y = pt + ih - ih * i / 4; g += `<line class="gl" x1="${pl}" x2="${W - pr}" y1="${y}" y2="${y}"/><text x="${pl - 8}" y="${y + 4}" text-anchor="end">${nf(mx * i / 4)}</text>`; }
   const every = Math.ceil(n / 7); let xl = '';
-  bk.forEach((b, i) => { if (i % every === 0 || i === n - 1) { const d = new Date(b.t); xl += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle">${hourly ? d.getHours() + ':00' : d.toLocaleDateString(loc(), { month: 'short', day: 'numeric' })}</text>`; } });
+  bk.forEach((b, i) => { if (i % every === 0 || i === n - 1) xl += `<text x="${X(i)}" y="${H - 6}" text-anchor="middle">${lab(b)}</text>`; });
   const area = smooth(ps) + ` L${ps[n - 1][0]} ${pt + ih} L${ps[0][0]} ${pt + ih} Z`;
   const sw = n === 1 ? iw : iw / (n - 1);
-  const hits = bk.map((b, i) => `<rect class="hit" x="${X(i) - sw / 2}" y="${pt}" width="${sw}" height="${ih}" data-tip="${esc((hourly ? new Date(b.t).getHours() + ':00' : new Date(b.t).toLocaleDateString(loc(), { weekday: 'short', month: 'short', day: 'numeric' })) + '|' + t('s_visits') + ': ' + b.s + '|' + t('s_unique') + ': ' + b.u.size)}"/>`).join('');
-  return `<div style="direction:ltr"><svg class="chart" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--acc)" stop-opacity=".38"/><stop offset="1" stop-color="var(--acc)" stop-opacity="0"/></linearGradient></defs>${g}${xl}<path d="${area}" fill="url(#ga)"/><path d="${smooth(ps)}" fill="none" stroke="var(--acc)" stroke-width="2.6" stroke-linecap="round"/><path d="${smooth(pu)}" fill="none" stroke="var(--acc2)" stroke-width="2" stroke-dasharray="5 5" stroke-linecap="round"/>${hits}</svg></div>
-  <div class="legend"><span><i style="background:var(--acc)"></i>${t('s_visits')}</span><span><i style="background:var(--acc2)"></i>${t('s_unique')}</span></div>`;
+  const avgL = total ? `<line class="avg" x1="${pl}" x2="${W - pr}" y1="${Y(avg).toFixed(1)}" y2="${Y(avg).toFixed(1)}"/><text class="avl" x="${pl + 6}" y="${(Y(avg) - 5).toFixed(1)}" text-anchor="start">${t('k_avgb')} ${avg < 10 ? avg.toFixed(1) : nf(avg)}</text>` : '';
+  const pkM = total ? `<circle class="pkm" cx="${ps[pk][0]}" cy="${ps[pk][1]}" r="5"/><text class="pkt" x="${ps[pk][0]}" y="${ps[pk][1] - 11}" text-anchor="middle">${nf(mxv)}</text>` : '';
+  const cols = bk.map((b, i) => {
+    const d = i && vals[i - 1] ? Math.round((b.s - vals[i - 1]) / vals[i - 1] * 100) : null;
+    const tip = lab(b, true) + '|' + t('s_visits') + ': ' + b.s + '|' + t('s_unique') + ': ' + b.u.size + (d != null ? '|' + (d > 0 ? '+' : '') + d + '% ' + t('vs_prev_b') : '');
+    return `<g class="col"><rect class="hit" x="${(X(i) - sw / 2).toFixed(1)}" y="${pt}" width="${sw.toFixed(1)}" height="${ih}" data-tip="${esc(tip)}"/><line class="cx" x1="${ps[i][0]}" x2="${ps[i][0]}" y1="${pt}" y2="${pt + ih}"/><circle class="dt2" cx="${pu[i][0]}" cy="${pu[i][1]}" r="4"/><circle class="dt" cx="${ps[i][0]}" cy="${ps[i][1]}" r="5"/></g>`;
+  }).join('');
+  const stats = `<div class="cstats"><div><small>${t('k_totalv')}</small><b>${nf(total)}</b></div><div><small>${t('k_peak')}</small><b>${nf(mxv)}</b>${total ? `<em>${lab(bk[pk])}</em>` : ''}</div><div><small>${t('k_avgb')}</small><b>${avg < 10 ? avg.toFixed(1) : nf(avg)}</b><em>${t(hourly ? 'per_h' : 'per_d')}</em></div></div>`;
+  return `${stats}<div style="direction:ltr"><svg class="chart" viewBox="0 0 ${W} ${H}"><defs><linearGradient id="ga" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="var(--acc)" stop-opacity=".4"/><stop offset="1" stop-color="var(--acc)" stop-opacity="0"/></linearGradient></defs>${g}${xl}${avgL}<path d="${area}" fill="url(#ga)"/><path class="ln" d="${smooth(ps)}" fill="none" stroke="var(--acc)" stroke-width="2.8" stroke-linecap="round"/><path d="${smooth(pu)}" fill="none" stroke="var(--acc2)" stroke-width="2" stroke-dasharray="5 5" stroke-linecap="round"/>${pkM}${cols}</svg></div>
+  <div class="legend"><span><i style="background:var(--acc)"></i>${t('s_visits')}</span><span><i style="background:var(--acc2)"></i>${t('s_unique')}</span><span><i style="background:var(--warn)"></i>${t('k_avgb')}</span></div>`;
 }
 function donut(items, labelFn) {
   const tot = items.reduce((a, b) => a + b[1], 0); if (!tot) return emptyBox();
-  const r = 54, c = 2 * Math.PI * r; let off = 0, segs = '';
-  items.slice(0, 5).forEach(([k, v], i) => { const len = v / tot * c; segs += `<circle cx="70" cy="70" r="${r}" fill="none" stroke="${COLORS[i]}" stroke-width="16" stroke-dasharray="${Math.max(0, len - 2).toFixed(1)} ${c.toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 70 70)" stroke-linecap="butt"/>`; off += len; });
-  const lg = items.slice(0, 5).map(([k, v], i) => `<div><i style="background:${COLORS[i]}"></i><span>${esc(labelFn(k))}</span><b>${Math.round(v / tot * 100)}%</b></div>`).join('');
-  return `<div class="donut-wrap"><svg viewBox="0 0 140 140"><circle cx="70" cy="70" r="${r}" fill="none" stroke="var(--line)" stroke-width="16"/>${segs}<text x="70" y="68" text-anchor="middle" style="font-size:24px;font-weight:700;fill:var(--text)">${nf(tot)}</text><text x="70" y="86" text-anchor="middle" style="font-size:10.5px;fill:var(--muted)">${t('s_unique')}</text></svg><div class="lg">${lg}</div></div>`;
+  const r = 52, c = 2 * Math.PI * r, top = items.slice(0, 5), rest = items.slice(5).reduce((a, b) => a + b[1], 0);
+  const list = rest ? top.concat([['__o', rest]]) : top, gap = list.length > 1 ? 3 : 0;
+  let off = 0, segs = '';
+  list.forEach(([k, v], i) => {
+    const len = v / tot * c, nm = k === '__o' ? t('other') : labelFn(k);
+    segs += `<circle class="seg" data-tip="${esc(nm + '|' + nf(v) + ' · ' + (v / tot * 100).toFixed(1) + '%')}" cx="70" cy="70" r="${r}" fill="none" stroke="${COLORS[i]}" stroke-width="16" stroke-dasharray="${Math.max(0, len - gap).toFixed(1)} ${c.toFixed(1)}" stroke-dashoffset="${(-off).toFixed(1)}" transform="rotate(-90 70 70)"/>`;
+    off += len;
+  });
+  const lg = list.map(([k, v], i) => `<div><i style="background:${COLORS[i]}"></i><span>${esc(k === '__o' ? t('other') : labelFn(k))}</span><b>${nf(v)}</b><em>${Math.round(v / tot * 100)}%</em></div>`).join('');
+  return `<div class="donut-wrap"><svg viewBox="0 0 140 140"><circle cx="70" cy="70" r="${r}" fill="none" stroke="var(--line)" stroke-width="16"/>${segs}<text x="70" y="68" text-anchor="middle" style="font-size:24px;font-weight:800;fill:var(--text)">${nf(tot)}</text><text x="70" y="86" text-anchor="middle" style="font-size:10.5px;fill:var(--muted)">${t('s_unique')}</text></svg><div class="lg">${lg}</div></div>`;
 }
 function bars(items, o = {}) {
   if (!items.length) return emptyBox();
-  const mx = Math.max(1, ...items.map(i => i[1])), tot = items.reduce((a, b) => a + b[1], 0);
-  return `<div class="bars">${items.slice(0, o.max || 6).map(([k, v]) => `<div class="bar"><div class="row"><span>${o.pre ? o.pre(k) : ''}${esc(o.label ? o.label(k) : k)}</span><b>${o.fmt ? o.fmt(v) : nf(v)}${o.pct === false ? '' : `<em>${Math.round(v / tot * 100)}%</em>`}</b></div><div class="tr"><i style="width:${(v / mx * 100).toFixed(1)}%"></i></div></div>`).join('')}</div>`;
+  const list = items.slice(0, o.max || 6), mx = Math.max(1, ...list.map(i => i[1])), tot = items.reduce((a, b) => a + b[1], 0) || 1;
+  const pc = v => { const p = v / tot * 100; return (p < 10 ? p.toFixed(1) : Math.round(p)) + '%'; };
+  return `<div class="bars">${list.map(([k, v], i) => { const nm = o.label ? o.label(k) : k, val = o.fmt ? o.fmt(v) : nf(v);
+    return `<div class="bar" data-tip="${esc(nm + '|' + val + ' · ' + pc(v))}"><div class="row"><span><em class="rk">${i + 1}</em>${o.pre ? o.pre(k) : ''}${esc(nm)}</span><b>${val}${o.pct === false ? '' : `<em>${pc(v)}</em>`}</b></div><div class="tr"><i style="width:${(v / mx * 100).toFixed(1)}%;--d:${i * 70}ms"></i></div></div>`; }).join('')}</div>`;
 }
 function heat(arr) {
-  const mx = Math.max(1, ...arr);
-  return `<div class="heat">${arr.map((v, i) => `<i style="--a:${(v / mx).toFixed(2)}" data-tip="${esc(i + ':00|' + t('s_visits') + ': ' + v)}"><span>${i}</span></i>`).join('')}</div>`;
+  const mx = Math.max(1, ...arr), pk = arr.indexOf(Math.max(...arr)), tot = arr.reduce((a, b) => a + b, 0);
+  const cell = (v, i) => `<i class="${v && v === mx ? 'pk' : ''}" style="--a:${(v / mx).toFixed(2)}" data-tip="${esc(i + ':00 – ' + ((i + 1) % 24) + ':00|' + t('s_visits') + ': ' + v + (tot ? ' · ' + Math.round(v / tot * 100) + '%' : ''))}"><span>${i}</span></i>`;
+  return `<div class="heat">${arr.map(cell).join('')}</div><div class="heat-l"><span>${t('less')}</span><u></u><span>${t('more')}</span>${tot ? `<b>${t('k_peak')} · ${pk}:00</b>` : ''}</div>`;
+}
+function cols(items) {
+  const mx = Math.max(1, ...items.map(i => i[1])), tot = items.reduce((a, b) => a + b[1], 0);
+  if (!tot) return emptyBox();
+  return `<div class="cols">${items.map(([k, v], i) => `<div class="col2 ${v === mx ? 'pk' : ''}" data-tip="${esc(k + '|' + nf(v) + ' · ' + Math.round(v / tot * 100) + '%')}"><b>${nf(v)}</b><i style="height:${Math.max(3, v / mx * 100).toFixed(1)}%;animation-delay:${i * 50}ms"></i><span>${esc(k)}</span></div>`).join('')}</div>`;
 }
 const emptyBox = () => `<div class="empty"><b>${t('nodata')}</b>${t('nodata_sub')}</div>`;
-const kpi = (i, v, l, sp) => `<div class="card kpi"><div class="ic">${ic(i)}</div>${sp || ''}<div class="v">${v}</div><div class="l">${l}</div></div>`;
+const dl = d => d == null || !isFinite(d) ? '' : `<span class="dl ${d >= 0 ? 'up' : 'dn'}" data-tip="${esc(t('vs_prev'))}">${ic(d >= 0 ? 'up' : 'down')}${Math.abs(Math.round(d))}%</span>`;
+const kpi = (i, v, l, o = {}) => `<div class="card kpi" style="--c:${o.c || 'var(--acc)'}"><div class="kh"><div class="ic">${ic(i)}</div>${dl(o.d)}</div><div class="v">${v}</div><div class="l">${l}</div>${o.sp || ''}</div>`;
+const num = n => `<span data-n="${Math.round(n)}">${nf(n)}</span>`;
+function countUp(scope) {
+  if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  $$('[data-n]', scope).forEach(el => {
+    const to = +el.dataset.n; if (!isFinite(to) || to < 2) return;
+    const t0 = performance.now(), dur = 800;
+    const f = now => { const p = Math.min(1, (now - t0) / dur); el.textContent = nf(to * (1 - Math.pow(1 - p, 3))); if (p < 1) requestAnimationFrame(f); };
+    requestAnimationFrame(f);
+  });
+}
 
-/* ============================== الصفحات ============================== */
 function limitNote() { return S.sessions.length >= S.limit ? `<div class="note-ln">${t('limit_note', { n: nf(S.limit) })}</div>` : ''; }
 
+function hero(a) {
+  const u = S.user || {}, h = new Date().getHours(), g = t(h < 5 ? 'g_night' : h < 12 ? 'g_morning' : h < 18 ? 'g_noon' : 'g_evening');
+  const nm = String(u.displayName || (u.email || '').split('@')[0] || '').split(' ')[0];
+  const cfg = S.control.config || {}, today = S.sessions.filter(s => s.start >= cutoff('today')).length;
+  const live = Array.from(a.onlineDev.values()).sort((x, y) => y.last - x.last).slice(0, 5);
+  const flags = [cfg.maint ? `<span class="pill wr">${ic('wrench')}${t('hero_maint')}</span>` : '', cfg.annOn ? `<span class="pill in">${ic('mega')}${t('hero_ann')}</span>` : '', cfg.track === false ? `<span class="pill bd">${ic('alert')}${t('hero_notrack')}</span>` : ''].join('');
+  return `<section class="hero"><div class="hero-t"><small>${g}</small><h2>${esc(nm)} 👋</h2><p>${t('hero_sub', { n: nf(a.onlineDev.size), m: nf(today) })}</p><div class="hero-f">${flags}</div>
+    <div class="hero-a"><button class="btn pri" data-act="nav" data-page="live">${ic('pulse')}${t('nav_live')}</button><button class="btn" data-act="nav" data-page="visitors">${ic('users')}${t('nav_visitors')}</button><button class="btn" data-act="nav" data-page="controls">${ic('sliders')}${t('nav_controls')}</button></div></div>
+    <div class="hero-r"><div class="ring"><div><b>${num(a.onlineDev.size)}</b><small>${t('k_online')}</small></div></div>${live.length ? `<div class="stack">${live.map(s => avt(s.deviceId, s.device, 36)).join('')}</div>` : ''}</div></section>`;
+}
+
 function pOverview() {
-  const a = calc(), spk = a.buckets.map(b => b.s), spu = a.buckets.map(b => b.u.size);
-  const ret = a.uniq ? Math.round(a.returning / a.uniq * 100) : 0;
-  return `<div class="grid g-kpi">
-    ${kpi('pulse', `<span class="live-dot"></span> ${nf(a.onlineDev.size)}`, t('k_online'))}
-    ${kpi('users', nf(a.uniq), t('k_unique'), spark(spu))}
-    ${kpi('layers', nf(a.ss.length), t('k_sessions'), spark(spk, 'var(--acc2)'))}
-    ${kpi('clock', fmtDur(a.avg), t('k_avg'))}
-    ${kpi('globe', S.counts ? nf(S.counts.visitors) : nf(S.visitors.length), `${t('k_total')} · ${t('k_alltime')}`)}
-    ${kpi('repeat', ret + '%', t('k_return'))}
+  const a = calc(), spk = a.buckets.map(b => b.s), spu = a.buckets.map(b => b.u.size), p = a.prev;
+  const ret = a.uniq ? Math.round(a.returning / a.uniq * 100) : 0, d = (c, q) => p && q ? (c - q) / q * 100 : null;
+  return `${hero(a)}
+  <div class="grid g-kpi">
+    ${kpi('pulse', `<span class="live-dot"></span>${num(a.onlineDev.size)}`, t('k_online'), { c: 'var(--ok)' })}
+    ${kpi('users', num(a.uniq), t('k_unique'), { c: 'var(--acc)', d: d(a.uniq, p && p.u), sp: spark(spu) })}
+    ${kpi('layers', num(a.ss.length), t('k_sessions'), { c: 'var(--acc2)', d: d(a.ss.length, p && p.n), sp: spark(spk, 'var(--acc2)') })}
+    ${kpi('clock', fmtDur(a.avg), t('k_avg'), { c: 'var(--acc3)', d: d(a.avg, p && p.avg) })}
+    ${kpi('globe', num(S.counts ? S.counts.visitors : S.visitors.length), `${t('k_total')} · ${t('k_alltime')}`, { c: 'var(--warn)' })}
+    ${kpi('repeat', ret + '%', t('k_return'), { c: 'var(--pink)' })}
   </div>
   <div class="grid g-2">
     <div class="card"><h3>${ic('pulse')} ${t('c_traffic')}</h3>${a.ss.length ? lineChart(a.buckets, a.hourly) : emptyBox()}${limitNote()}</div>
@@ -202,12 +259,12 @@ function pOverview() {
   <div class="grid g-3">
     <div class="card"><h3>${ic('monitor')} ${t('c_devices')}</h3>${donut(a.devices, devLabel)}</div>
     <div class="card"><h3>${ic('globe')} ${t('c_countries')}</h3>${bars(a.countries, { label: cname, pre: k => `<span class="flag">${flag(k)}</span>` })}</div>
-    <div class="card"><h3>${ic('layers')} ${t('c_browsers')}</h3>${bars(a.browsers)}<h3 style="margin-top:18px">${ic('gear')} ${t('c_os')}</h3>${bars(a.oss, { max: 4 })}</div>
+    <div class="card"><h3>${ic('layers')} ${t('c_browsers')}</h3>${bars(a.browsers, { max: 5 })}<h3 style="margin-top:20px">${ic('gear')} ${t('c_os')}</h3>${bars(a.oss, { max: 4 })}</div>
   </div>
   <div class="grid g-3">
-    <div class="card"><h3>${ic('clock')} ${t('c_sections')}</h3>${bars(a.vsecs, { label: secLabel, fmt: fmtDur, pct: false, max: 6 })}</div>
-    <div class="card"><h3>${ic('bolt')} ${t('c_actions')}</h3>${bars(a.acts, { label: actLabel, pct: false, max: 6 })}</div>
-    <div class="card"><h3>${ic('clock')} ${t('c_hours')}</h3>${heat(a.hours)}<h3 style="margin-top:18px">${ic('layers')} ${t('c_weekday')}</h3>${bars(a.wd.map((v, i) => [t('wd')[i], v]), { max: 7, pct: false })}</div>
+    <div class="card"><h3>${ic('clock')} ${t('c_sections')}</h3>${bars(a.vsecs, { label: secLabel, fmt: fmtDur })}</div>
+    <div class="card"><h3>${ic('bolt')} ${t('c_actions')}</h3>${bars(a.acts, { label: actLabel })}</div>
+    <div class="card"><h3>${ic('clock')} ${t('c_hours')}</h3>${heat(a.hours)}<h3 style="margin-top:20px">${ic('layers')} ${t('c_weekday')}</h3>${cols(a.wd.map((v, i) => [t('wd')[i], v]))}</div>
   </div>
   <div class="card"><h3>${ic('layers')} ${t('c_recent')}</h3>${sessionTable(a.ss.slice(0, 8), false)}</div>`;
 }
@@ -215,17 +272,21 @@ function pOverview() {
 function liveList(a, max) {
   const list = Array.from(a.onlineDev.values()).sort((x, y) => y.last - x.last).slice(0, max);
   if (!list.length) return `<div class="empty">${t('nobody')}</div>`;
-  return list.map(s => `<div class="sl" style="align-items:center;cursor:pointer" data-act="vopen" data-id="${esc(s.deviceId)}"><span class="dv"><span class="ico">${devIc(s.device)}</span><span><b>${esc(s.ip)}</b><small>${flag(s.country)} ${esc(cname(s.country))} · ${esc(s.browser)}</small></span></span><span style="text-align:end"><span class="pill ok"><span class="live-dot"></span>${esc(secLabel(s.view))}</span><br><small style="color:var(--muted)">${fmtDur(s.secs)}</small></span></div>`).join('');
+  return `<div class="ll">${list.map(s => `<div class="lr" data-act="vopen" data-id="${esc(s.deviceId)}">${avt(s.deviceId, s.device, 38)}<div class="lm"><b>${esc(vName(s.deviceId) || s.ip)}</b><small>${flag(s.country)} ${esc(cname(s.country))} · ${esc(s.browser)}</small></div><div class="lt"><span class="pill ok"><span class="live-dot"></span>${esc(secLabel(s.view))}</span><small>${fmtDur(s.secs)}</small></div></div>`).join('')}</div>`;
 }
 
 function pLive() {
   const a = calc(), list = Array.from(a.onlineDev.values()).sort((x, y) => y.last - x.last);
   if (!list.length) return `<div class="card"><div class="empty"><b>${t('nobody')}</b>${t('nodata_sub')}</div></div>`;
-  return `<div class="grid g-3">${list.map(s => `<div class="card">
-    <div class="dv" style="margin-bottom:14px">${avt(s.deviceId, s.device, 40)}<span><b>${esc(vName(s.deviceId) || s.ip)}</b><small>${flag(s.country)} ${esc(cname(s.country))}</small></span><span class="pill ok" style="margin-inline-start:auto"><span class="live-dot"></span>${t('st_online')}</span></div>
-    <div class="facts" style="margin-bottom:12px"><div class="fact"><small>${t('th_section')}</small><b>${esc(secLabel(s.view))}</b></div><div class="fact"><small>${t('th_dur')}</small><b>${fmtDur(s.secs)}</b></div><div class="fact"><small>${t('th_env')}</small><b>${esc(s.browser)} · ${esc(s.os)}</b></div><div class="fact"><small>${t('th_last')}</small><b>${ago(s.last)}</b></div></div>
+  const split = ['mobile', 'tablet', 'desktop'].map(d => [d, list.filter(s => s.device === d).length]).filter(x => x[1]);
+  const head = `<div class="card livehead"><div><span class="live-dot big"></span><b>${num(list.length)}</b><small>${t('k_online')}</small></div><div class="chips">${split.map(([d, n]) => `<span class="chip">${devIc(d)}${devLabel(d)} · ${nf(n)}</span>`).join('')}</div></div>`;
+  return head + `<div class="grid g-3">${list.map(s => {
+    const ev = S.events.find(e => e.deviceId === s.deviceId);
+    return `<div class="card lcard">
+    <div class="dv"><span class="lring">${avt(s.deviceId, s.device, 42)}</span><span style="min-width:0"><b>${esc(vName(s.deviceId) || s.ip)}</b><small>${flag(s.country)} ${esc(cname(s.country))}</small></span><span class="pill ok" style="margin-inline-start:auto"><span class="live-dot"></span>${t('st_online')}</span></div>
+    <div class="facts"><div class="fact"><small>${t('th_section')}</small><b>${esc(secLabel(s.view))}</b></div><div class="fact"><small>${t('th_dur')}</small><b>${fmtDur(s.secs)}</b></div><div class="fact"><small>${t('th_env')}</small><b>${esc(s.browser)} · ${esc(s.os)}</b></div><div class="fact"><small>${t('d_lastact')}</small><b>${ev ? esc(evText(ev)) : '—'}</b></div></div>
     <div class="row-act" style="justify-content:flex-start"><button class="btn sm" data-act="vopen" data-id="${esc(s.deviceId)}">${ic('eye')}${t('a_details')}</button><button class="btn sm" data-act="vmsg" data-id="${esc(s.deviceId)}">${ic('msg')}</button>${banBtn(s.deviceId)}</div>
-  </div>`).join('')}</div>`;
+  </div>`; }).join('')}</div>`;
 }
 
 function statusPill(v, onlineSet) {
@@ -245,41 +306,53 @@ function filteredVisitors() {
   const k = { last: (x, y) => y.last - x.last, visits: (x, y) => y.visits - x.visits, time: (x, y) => y.totalSecs - x.totalSecs, first: (x, y) => x.first - y.first }[S.vs];
   return { list: list.sort(k), online: a.onlineDev };
 }
+function vChips() {
+  const a = calc(), all = S.visitors;
+  const n = { all: all.length, online: all.filter(v => a.onlineDev.has(v.id)).length, returning: all.filter(v => v.visits > 1).length, banned: all.filter(isBanned).length };
+  return `<div class="fchips">${[['all', 'v_all'], ['online', 'v_online'], ['returning', 'v_returning'], ['banned', 'v_banned']].map(([k, l]) => `<button class="fc ${S.vf === k ? 'on' : ''}" data-act="vfset" data-v="${k}">${t(l)}<b>${nf(n[k])}</b></button>`).join('')}</div>`;
+}
 function visitorTable() {
   const { list, online } = filteredVisitors();
-  if (!list.length) return emptyBox();
+  const chips = vChips();
+  if (!list.length) return chips + emptyBox();
   const rows = list.slice(0, S.vShow).map(v => `<tr class="click" data-act="vopen" data-id="${esc(v.id)}">
-    <td><div class="dv">${avt(v.id, v.device)}<span><b>${esc(v.name || short(v.id))}</b><small>${esc(v.name ? short(v.id) + ' · ' : '')}${esc(devLabel(v.device))}${v.note ? ' · ' + esc(v.note.slice(0, 24)) : ''} ${wipePill(v.id)}</small></span></div></td>
-    <td class="mono">${esc(v.ip)}${v.ips.length > 1 ? ` <small style="color:var(--muted)">+${v.ips.length - 1}</small>` : ''}</td>
-    <td><span class="flag">${flag(v.country)}</span>${esc(cname(v.country))}</td>
-    <td>${esc(v.browser)} · ${esc(v.os)}</td><td>${nf(v.visits)}</td><td>${fmtDur(v.totalSecs)}</td><td>${ago(v.last)}</td><td>${statusPill(v, online)}</td>
-    <td><div class="row-act"><button class="btn sm" data-act="vmsg" data-id="${esc(v.id)}" title="${t('a_message')}">${ic('msg')}</button>${banBtn(v.id)}<button class="btn sm bad" data-act="vdel" data-id="${esc(v.id)}" title="${esc(t('v_del_row'))}">${ic('trash')}</button></div></td></tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>${t('th_device')}</th><th>${t('th_ip')}</th><th>${t('th_country')}</th><th>${t('th_env')}</th><th>${t('th_visits')}</th><th>${t('th_time')}</th><th>${t('th_last')}</th><th>${t('th_status')}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
+    <td><div class="dv">${avt(v.id, v.device)}<span><b>${esc(v.name || short(v.id))}</b><small><span class="mono">${esc(v.ip)}</span>${v.ips.length > 1 ? ' +' + (v.ips.length - 1) : ''} · ${esc(v.name ? short(v.id) + ' · ' : '')}${esc(devLabel(v.device))}${v.note ? ' · ' + esc(v.note.slice(0, 24)) : ''} ${wipePill(v.id)}</small></span></div></td>
+    <td data-l="${t('th_country')}"><span><span class="flag">${flag(v.country)}</span>${esc(cname(v.country))}</span></td>
+    <td data-l="${t('th_env')}">${esc(v.browser)} · ${esc(v.os)}</td><td data-l="${t('th_visits')}">${nf(v.visits)}</td><td data-l="${t('th_time')}">${fmtDur(v.totalSecs)}</td>
+    <td data-l="${t('th_last')}"><span class="seen">${online.has(v.id) ? '<span class="live-dot"></span>' : ''}${ago(v.last)}</span></td><td data-l="${t('th_status')}">${statusPill(v, online)}</td>
+    <td class="acts"><div class="row-act"><button class="btn sm" data-act="vmsg" data-id="${esc(v.id)}" title="${t('a_message')}">${ic('msg')}</button>${banBtn(v.id)}<button class="btn sm bad" data-act="vdel" data-id="${esc(v.id)}" title="${esc(t('v_del_row'))}">${ic('trash')}</button></div></td></tr>`).join('');
+  return `${chips}<div class="sumrow"><span><b>${nf(list.length)}</b> / ${nf(S.visitors.length)}</span></div><div class="tw rt vt"><table><thead><tr><th>${t('th_device')} · ${t('th_ip')}</th><th>${t('th_country')}</th><th>${t('th_env')}</th><th>${t('th_visits')}</th><th>${t('th_time')}</th><th>${t('th_last')}</th><th>${t('th_status')}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
   ${list.length > S.vShow ? `<div class="more"><button class="btn" data-act="morev">${t('a_load_more')} (${nf(list.length - S.vShow)})</button></div>` : ''}`;
 }
 function pVisitors() {
-  const opt = (v, k, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t(k)}</option>`;
+  const opt = (v, k, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t(k)}</option>`, ob = !!(S.control.config || {}).offlineBlock;
   return `<div class="card"><div class="tbar">
     <div class="search">${ic('search')}<input id="vq" value="${esc(S.vq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div>
-    <select class="inp" id="vf">${opt('all', 'v_all', S.vf)}${opt('online', 'v_online', S.vf)}${opt('returning', 'v_returning', S.vf)}${opt('banned', 'v_banned', S.vf)}</select>
     <select class="inp" id="vs">${opt('last', 'sort_last', S.vs)}${opt('visits', 'sort_visits', S.vs)}${opt('time', 'sort_time', S.vs)}${opt('first', 'sort_first', S.vs)}</select>
-    <button class="btn pri" data-act="updall">${ic('bolt')}${t('a_updall')}</button><button class="btn ${(S.control.config || {}).offlineBlock ? 'bad on' : ''}" data-act="vofflineall">${ic((S.control.config || {}).offlineBlock ? 'wifi' : 'wifi-off')}${t((S.control.config || {}).offlineBlock ? 'a_offline_out_allow' : 'a_offline_out_block')}</button><button class="btn bad" data-act="vclear">${ic('trash')}${t('a_clear')}</button><button class="btn bad" data-act="vclearall">${ic('trash')}${t('v_clear_all')}</button><button class="btn" data-act="csv">${ic('download')}${t('a_export')}</button></div>
+    <button class="btn pri" data-act="updall">${ic('bolt')}${t('a_updall')}</button><button class="btn" data-act="csv">${ic('download')}${t('a_export')}</button>
+    <details class="dd"><summary class="btn">${ic('dots')}${t('v_bulk')}</summary><div class="ddm">
+      <button class="btn ${ob ? 'bad on' : ''}" data-act="vofflineall">${ic(ob ? 'wifi' : 'wifi-off')}${t(ob ? 'a_offline_out_allow' : 'a_offline_out_block')}</button>
+      <button class="btn bad" data-act="vclear">${ic('trash')}${t('a_clear')}</button><button class="btn bad" data-act="vclearall">${ic('trash')}${t('v_clear_all')}</button></div></details></div>
     <div id="tbl">${visitorTable()}</div></div>`;
 }
 
 function sessionTable(list, del) {
   if (!list.length) return emptyBox();
   del = del !== false;
+  const mx = Math.max(1, ...list.map(s => s.secs));
   const rows = list.map(s => `<tr class="click" data-act="sopen" data-id="${esc(s.id)}">
-    <td>${dtm(s.start)}</td><td class="mono">${esc(s.ip)}</td><td><span class="flag">${flag(s.country)}</span>${esc(cname(s.country))}</td>
-    <td><span class="dv"><span class="ico" style="width:28px;height:28px;border-radius:9px">${devIc(s.device)}</span>${esc(s.browser)}</span></td>
-    <td>${fmtDur(s.secs)}</td><td>${esc(secLabel(s.view))}</td><td>${nf(Object.values(s.acts).reduce((x, y) => x + y, 0))}</td><td>${esc(s.ref || '—')}</td>${del ? `<td><button class="btn sm bad" data-act="sdel" data-id="${esc(s.id)}" title="${esc(t('s_del'))}">${ic('trash')}</button></td>` : ''}</tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>${t('th_start')}</th><th>${t('th_ip')}</th><th>${t('th_country')}</th><th>${t('th_device')}</th><th>${t('th_dur')}</th><th>${t('th_section')}</th><th>${t('th_used')}</th><th>${t('th_ref')}</th>${del ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
+    <td>${dtm(s.start)}</td><td class="mono" data-l="${t('th_ip')}">${esc(s.ip)}</td><td data-l="${t('th_country')}"><span><span class="flag">${flag(s.country)}</span>${esc(cname(s.country))}</span></td>
+    <td data-l="${t('th_device')}"><span class="dv"><span class="ico" style="width:28px;height:28px;border-radius:9px">${devIc(s.device)}</span>${esc(s.browser)}</span></td>
+    <td data-l="${t('th_dur')}"><div class="dur"><span>${fmtDur(s.secs)}</span><i><u style="width:${(s.secs / mx * 100).toFixed(0)}%"></u></i></div></td><td data-l="${t('th_section')}">${esc(secLabel(s.view))}</td>
+    <td data-l="${t('th_used')}">${nf(Object.values(s.acts).reduce((x, y) => x + y, 0))}</td><td data-l="${t('th_ref')}">${esc(s.ref || '—')}</td>${del ? `<td class="acts"><button class="btn sm bad" data-act="sdel" data-id="${esc(s.id)}" title="${esc(t('s_del'))}">${ic('trash')}</button></td>` : ''}</tr>`).join('');
+  return `<div class="tw rt"><table><thead><tr><th>${t('th_start')}</th><th>${t('th_ip')}</th><th>${t('th_country')}</th><th>${t('th_device')}</th><th>${t('th_dur')}</th><th>${t('th_section')}</th><th>${t('th_used')}</th><th>${t('th_ref')}</th>${del ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function sessionsBody() {
   const a = calc(), q = S.sq.trim().toLowerCase();
   const list = a.ss.filter(s => !q || (s.ip + ' ' + s.country + ' ' + cname(s.country) + ' ' + s.browser + ' ' + s.os + ' ' + s.ref + ' ' + s.deviceId).toLowerCase().includes(q));
-  return sessionTable(list.slice(0, S.sShow)) + (list.length > S.sShow ? `<div class="more"><button class="btn" data-act="mores">${t('a_load_more')} (${nf(list.length - S.sShow)})</button></div>` : '') + limitNote();
+  const tot = list.reduce((x, s) => x + s.secs, 0);
+  const sum = list.length ? `<div class="sumrow"><span><b>${nf(list.length)}</b> ${t('k_sessions')}</span><span>${t('k_avg')}: <b>${fmtDur(tot / list.length)}</b></span><span>${t('d_total')}: <b>${fmtDur(tot)}</b></span></div>` : '';
+  return sum + sessionTable(list.slice(0, S.sShow)) + (list.length > S.sShow ? `<div class="more"><button class="btn" data-act="mores">${t('a_load_more')} (${nf(list.length - S.sShow)})</button></div>` : '') + limitNote();
 }
 function pSessions() {
   return `<div class="card"><div class="tbar"><div class="search">${ic('search')}<input id="sq" value="${esc(S.sq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div><button class="btn bad" data-act="sclear">${ic('trash')}${t('s_clear_all')}</button></div><div id="tbl">${sessionsBody()}</div></div>`;
@@ -288,37 +361,41 @@ function pSessions() {
 function pUsage() {
   const a = calc();
   return `<div class="grid g-2e">
-    <div class="card"><h3>${ic('clock')} ${t('c_sections')}</h3>${bars(a.vsecs, { label: secLabel, fmt: fmtDur, pct: false, max: 10 })}</div>
+    <div class="card"><h3>${ic('clock')} ${t('c_sections')}</h3>${bars(a.vsecs, { label: secLabel, fmt: fmtDur, max: 10 })}</div>
     <div class="card"><h3>${ic('eye')} ${t('c_views')}</h3>${bars(a.views, { label: secLabel, max: 10 })}</div></div>
   <div class="grid g-2e">
-    <div class="card"><h3>${ic('bolt')} ${t('c_actions')}</h3>${bars(a.acts, { label: actLabel, pct: false, max: 10 })}</div>
-    <div class="card"><h3>${ic('layers')} ${t('c_dur')}</h3>${bars(a.durB.map((v, i) => [t('dur_b')[i] || i, v]).filter(x => true), { max: 5 })}</div></div>
+    <div class="card"><h3>${ic('bolt')} ${t('c_actions')}</h3>${bars(a.acts, { label: actLabel, max: 10 })}</div>
+    <div class="card"><h3>${ic('layers')} ${t('c_dur')}</h3>${cols(a.durB.map((v, i) => [t('dur_b')[i] || i, v]))}</div></div>
   <div class="grid g-2e">
     <div class="card"><h3>${ic('clock')} ${t('c_hours')}</h3>${heat(a.hours)}</div>
-    <div class="card"><h3>${ic('layers')} ${t('c_weekday')}</h3>${bars(a.wd.map((v, i) => [t('wd')[i], v]), { max: 7 })}</div></div>${limitNote()}`;
+    <div class="card"><h3>${ic('layers')} ${t('c_weekday')}</h3>${cols(a.wd.map((v, i) => [t('wd')[i], v]))}</div></div>${limitNote()}`;
+}
+
+function ctlStatus(cfg, bans) {
+  const it = (c, i, l, on, v) => `<div class="stc ${on ? 'on' : ''}" style="--c:var(${c})"><span class="ic">${ic(i)}</span><div><small>${l}</small><b>${v}</b></div></div>`;
+  const st = on => t(on ? 'fl_on' : 'fl_off'), trk = cfg.track !== false;
+  return `<div class="stbar">${it('--acc', 'mega', t('ctl_ann'), !!cfg.annOn, st(!!cfg.annOn))}${it('--warn', 'wrench', t('ctl_maint'), !!cfg.maint, st(!!cfg.maint))}${it('--acc2', 'pulse', t('ctl_track'), trk, st(trk))}${it('--bad', 'wifi-off', t('ctl_offline'), !!cfg.offlineBlock, st(!!cfg.offlineBlock))}${it('--acc3', 'ban', t('ctl_bans'), bans.length > 0, nf(bans.length))}</div>`;
 }
 
 function pControls() {
   const cfg = S.control.config || {}, bans = Object.entries(S.control).filter(([k, o]) => (k.startsWith('d_') || k.startsWith('i_')) && banActive(o));
   const kinds = ['info', 'warn', 'bad'].map(k => `<option value="${k}" ${cfg.annKind === k ? 'selected' : ''}>${t('k_' + k)}</option>`).join('');
-  return `<div class="grid g-2e">
+  return `${ctlStatus(cfg, bans)}<div class="grid g-2e">
   <div class="card"><div class="ctl-h" style="--c:var(--acc)"><span class="ic">${ic('mega')}</span><div><b>${t('ctl_ann')}</b><small>${t('ctl_ann_sub')}</small></div><label class="sw"><input type="checkbox" id="annOn" ${cfg.annOn ? 'checked' : ''}><i></i></label></div>
     <form data-form="ann"><div class="fld"><label>${t('ctl_ann_text')}</label><textarea class="inp" name="text" maxlength="240">${esc(cfg.annText || '')}</textarea></div>
     <div class="inl"><div class="fld"><label>${t('ctl_kind')}</label><select class="inp" name="kind" style="width:100%">${kinds}</select></div><button class="btn pri" type="submit">${ic('check')}${t('a_save')}</button></div></form></div>
   <div class="card"><div class="ctl-h" style="--c:var(--warn)"><span class="ic">${ic('wrench')}</span><div><b>${t('ctl_maint')}</b><small>${t('ctl_maint_sub')}</small></div><label class="sw"><input type="checkbox" id="maintOn" ${cfg.maint ? 'checked' : ''}><i></i></label></div>
     <form data-form="maint"><div class="fld"><label>${t('ctl_maint_msg')}</label><textarea class="inp" name="text" maxlength="240">${esc(cfg.maintMsg || '')}</textarea></div><button class="btn pri" type="submit">${ic('check')}${t('a_save')}</button></form></div></div>
-  <div class="grid g-2e">
-  <div class="card"><div class="ctl-h" style="--c:var(--acc2)"><span class="ic">${ic('pulse')}</span><div><b>${t('ctl_track')}</b><small>${t('ctl_track_sub')}</small></div><label class="sw"><input type="checkbox" id="trackOn" ${cfg.track === false ? '' : 'checked'}><i></i></label></div>
-    <div class="hint-box">${ic('alert')} ${t('b_hint')}</div></div>
+  <div class="grid g-3">
+  <div class="card"><div class="ctl-h" style="--c:var(--acc2)"><span class="ic">${ic('pulse')}</span><div><b>${t('ctl_track')}</b><small>${t('ctl_track_sub')}</small></div><label class="sw"><input type="checkbox" id="trackOn" ${cfg.track === false ? '' : 'checked'}><i></i></label></div></div>
   <div class="card"><div class="ctl-h" style="--c:var(--acc3)"><span class="ic">${ic('refresh')}</span><div><b>${t('ctl_upd')}</b><small>${t('ctl_upd_sub')}</small></div></div>
     <button class="btn pri" data-act="updall">${ic('bolt')}${t('ctl_upd_all')}</button></div>
-  <div class="card"><div class="ctl-h" style="--c:var(--bad)"><span class="ic">${ic('wifi-off')}</span><div><b>${t('ctl_offline')}</b><small>${t('ctl_offline_sub')}</small></div><label class="sw"><input type="checkbox" id="offAllOn" ${cfg.offlineBlock ? 'checked' : ''}><i></i></label></div>
-    <div class="hint-box">${ic('alert')} ${t(cfg.offlineBlock ? 'ctl_offline_on' : 'ctl_offline_off')}</div></div></div>
+  <div class="card"><div class="ctl-h" style="--c:var(--bad)"><span class="ic">${ic('wifi-off')}</span><div><b>${t('ctl_offline')}</b><small>${t('ctl_offline_sub')}</small></div><label class="sw"><input type="checkbox" id="offAllOn" ${cfg.offlineBlock ? 'checked' : ''}><i></i></label></div></div></div>
   <div class="grid g-2e">
   <div class="card"><h3>${ic('ban')} ${t('ctl_addban')}</h3><form data-form="banip"><div class="inl"><div class="fld"><label>${t('ctl_ip')}</label><input class="inp mono" name="ip" required maxlength="45" placeholder="41.34.12.9"></div>
     <div class="fld"><label>${t('b_dur')}</label><select class="inp" name="dur" style="width:100%"><option value="3600000">${t('b_1h')}</option><option value="86400000">${t('b_24h')}</option><option value="604800000">${t('b_7d')}</option><option value="0" selected>${t('b_forever')}</option></select></div></div>
-    <div class="fld" style="margin-top:12px"><label>${t('b_reason')}</label><input class="inp" name="reason" maxlength="120"></div><button class="btn bad" type="submit">${ic('ban')}${t('a_banip')}</button></form></div></div>
-  <div class="card"><h3>${ic('shield')} ${t('ctl_bans')}<small>${bans.length}</small></h3>${bans.length ? bans.map(([k, o]) => `<div class="banrow"><span class="ico pill bd">${ic('ban')}</span><div><b class="mono">${k.startsWith('d_') ? esc(short(k.slice(2))) + '…' : esc(o.value || k)}</b><small>${k.startsWith('d_') ? t('th_device') : t('th_ip')} · ${ms(o.until) ? t('ctl_until') + ' ' + dtm(ms(o.until)) : t('ctl_forever')}${o.reason ? ' · ' + esc(o.reason) : ''}</small></div><button class="btn sm" data-act="unban" data-key="${esc(k)}">${t('a_unban')}</button></div>`).join('') : `<div class="empty">${t('ctl_nobans')}</div>`}</div>`;
+    <div class="fld" style="margin-top:12px"><label>${t('b_reason')}</label><input class="inp" name="reason" maxlength="120"></div><button class="btn bad" type="submit">${ic('ban')}${t('a_banip')}</button></form></div>
+  <div class="card"><h3>${ic('shield')} ${t('ctl_bans')}<small>${bans.length}</small></h3>${bans.length ? bans.map(([k, o]) => `<div class="banrow"><span class="ico pill bd">${ic('ban')}</span><div><b class="mono">${k.startsWith('d_') ? esc(short(k.slice(2))) + '…' : esc(o.value || k)}</b><small>${k.startsWith('d_') ? t('th_device') : t('th_ip')} · ${ms(o.until) ? t('ctl_until') + ' ' + dtm(ms(o.until)) : t('ctl_forever')}${o.reason ? ' · ' + esc(o.reason) : ''}</small></div><button class="btn sm" data-act="unban" data-key="${esc(k)}">${t('a_unban')}</button></div>`).join('') : `<div class="empty">${t('ctl_nobans')}</div>`}</div></div>`;
 }
 
 function pTeam() {
@@ -335,7 +412,7 @@ function pSettings() {
     <div class="fld"><label>${t('set_limit')}</label><select class="inp" id="limSel" style="align-self:flex-start">${lim}</select><small style="color:var(--muted)">${t('set_limit_sub')}</small></div>
     <div class="fld"><label>${t('set_proj')}</label><span class="mono">${esc(S.B.projectId)}</span>${S.demo ? `<span class="badge-demo" style="align-self:flex-start">${t('set_demo')}</span>` : ''}</div></div>
   <div class="card"><h3>${ic('trash')} ${t('set_clean')}</h3><div class="sub">${t('set_clean_sub')}</div><div class="inl"><div class="fld"><label>${t('set_clean_btn')}</label><select class="inp" id="cleanSel" style="width:100%">${days}</select></div><button class="btn bad" data-act="clean">${ic('trash')}${t('a_delete')}</button></div>
-    <div style="margin-top:22px"><button class="btn" data-act="json">${ic('download')}${t('set_exp')}</button></div><div class="hint-box">${t('priv')}</div></div></div>`;
+    <div style="margin-top:22px"><button class="btn" data-act="json">${ic('download')}${t('set_exp')}</button></div></div></div>`;
 }
 
 const PAGE_FN = { overview: pOverview, live: pLive, feed: pFeed, visitors: pVisitors, sessions: pSessions, usage: pUsage, controls: pControls, team: pTeam, settings: pSettings };
@@ -343,17 +420,16 @@ const NAV = [['overview', 'dash'], ['live', 'pulse'], ['feed', 'bolt'], ['visito
 const RANGED = ['overview', 'usage', 'sessions'];
 const LIVE_PAGES = ['overview', 'live', 'usage', 'feed'];
 
-/* ============================== الهيكل ============================== */
 function shell() {
   const u = S.user, name = u.displayName || u.email || '';
   const nav = NAV.map(([p, i], idx) => `${idx === 0 ? `<div class="nav-h">${t('sec_analytics')}</div>` : ''}${p === 'controls' ? `<div class="nav-h">${t('sec_manage')}</div>` : ''}<a data-act="nav" data-page="${p}" class="${S.page === p ? 'on' : ''}">${ic(i)}<span>${t('nav_' + p)}</span>${p === 'live' ? '<span class="cnt" id="liveCnt">0</span>' : ''}</a>`).join('');
+  const bn = [['overview', 'dash'], ['live', 'pulse'], ['visitors', 'users'], ['controls', 'sliders']].map(([p, i]) => `<a data-act="nav" data-page="${p}" class="${S.page === p ? 'on' : ''}">${ic(i)}<span>${t('nav_' + p)}</span>${p === 'live' ? '<em class="cnt" id="liveCnt2">0</em>' : ''}</a>`).join('') + `<a data-act="menu">${ic('menu')}<span>${t('nav_more')}</span></a>`;
   root.innerHTML = `<div class="app"><aside class="side"><div class="brand"><img src="../assets/img/novix-icon-64.png" alt=""><div><b>NOVIX</b><small>${t('app')}</small></div></div><nav class="nav">${nav}</nav>
     <div class="side-foot"><div class="me"><span class="av">${u.photoURL ? `<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" alt="">` : esc(name.slice(0, 1).toUpperCase())}</span><div><b>${esc(name)}</b><small>${esc(u.email || '')}</small></div></div><button class="btn" data-act="signout">${ic('logout')}${t('signout')}</button></div></aside>
-    <main class="main"><div class="top"><button class="ib menu-btn" data-act="menu">${ic('menu')}</button><div class="grow"><h1 id="ttl"></h1><p id="sub"></p></div><div class="tools" id="tools"></div></div><div id="err"></div><div id="page"></div></main></div>`;
+    <main class="main"><div class="top"><button class="ib menu-btn" data-act="menu">${ic('menu')}</button><div class="grow"><h1 id="ttl"></h1><p id="sub"></p></div><div class="tools" id="tools"></div></div><div id="err"></div><div id="page"></div></main><nav class="bnav">${bn}</nav></div>`;
   head(); renderPage(false);
 }
 
-/* ====== تثبيت لوحة الإدارة كتطبيق (PWA) ====== */
 const isStandalone = () => matchMedia('(display-mode: standalone)').matches || !!navigator.standalone;
 const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 const canInstall = () => !isStandalone() && (!!window.__nxIP || isIOS);
@@ -368,33 +444,36 @@ if ('serviceWorker' in navigator && /^https?:$/.test(location.protocol)) navigat
 function head() {
   $('#ttl').textContent = t('nav_' + S.page); $('#sub').textContent = t('sub_' + S.page);
   const rng = ['today', '7d', '30d', 'all'].map(r => `<button data-act="range" data-v="${r}" class="${S.range === r ? 'on' : ''}">${t('r_' + r)}</button>`).join('');
-  $('#tools').innerHTML = `${S.demo ? `<span class="badge-demo">${t('demo_badge')}</span>` : ''}${RANGED.includes(S.page) ? `<div class="seg">${rng}</div>` : ''}
+  $('#tools').innerHTML = `${S.demo ? `<span class="badge-demo">${t('demo_badge')}</span>` : ''}${LIVE_PAGES.includes(S.page) ? `<span class="pill ok livepill"><span class="live-dot"></span>${t('live')}</span>` : ''}${RANGED.includes(S.page) ? `<div class="seg">${rng}</div>` : ''}
     ${canInstall() ? `<button class="btn sm pri" data-act="install">${ic('download')}${t('a_install')}</button>` : ''}<button class="ib" data-act="refresh" title="${t('a_refresh')}">${ic('refresh')}</button><button class="ib" data-act="lang" data-v="${lang === 'ar' ? 'en' : 'ar'}" title="Language"><b style="font-size:12px">${lang === 'ar' ? 'EN' : 'ع'}</b></button><button class="ib" data-act="theme" data-v="${theme === 'dark' ? 'light' : 'dark'}">${ic(theme === 'dark' ? 'sun' : 'moon')}</button>`;
-  $$('.nav a').forEach(a => a.classList.toggle('on', a.dataset.page === S.page));
+  $$('.nav a, .bnav a[data-page]').forEach(a => a.classList.toggle('on', a.dataset.page === S.page));
 }
+const SKEL = ['overview', 'live', 'feed', 'visitors', 'sessions', 'usage'];
+const skeleton = () => `<div class="grid g-kpi">${'<div class="skel"></div>'.repeat(6)}</div><div class="skel tall"></div>`;
+function updCnt() { const n = nf(calc().onlineDev.size); ['#liveCnt', '#liveCnt2'].forEach(s => { const c = $(s); if (c) c.textContent = n; }); }
 let lastPage = null;
 function renderPage(again) {
   const el = $('#page'); if (!el) return;
-  el.classList.toggle('again', !!again && lastPage === S.page); lastPage = S.page;
-  el.innerHTML = PAGE_FN[S.page]();
-  const n = calc().onlineDev.size, c = $('#liveCnt'); if (c) c.textContent = nf(n);
+  const same = !!again && lastPage === S.page; el.classList.toggle('again', same); lastPage = S.page;
+  el.innerHTML = !S.loaded && SKEL.includes(S.page) ? skeleton() : PAGE_FN[S.page]();
+  updCnt();
+  if (!same) countUp(el);
 }
 function renderTbl() { const el = $('#tbl'); if (!el) return; el.innerHTML = S.page === 'visitors' ? visitorTable() : sessionsBody(); }
 function showErr(msg) { const e = $('#err'); if (e) e.innerHTML = msg ? `<div class="err-bar">${ic('alert')} ${esc(msg)}</div>` : ''; }
 function go(p) { S.page = p; location.hash = p; document.body.classList.remove('nav-open'); head(); renderPage(false); window.scrollTo(0, 0); }
 
-/* ============================== نوافذ وإجراءات ============================== */
 function toast(msg, kind = 'ok') {
   $$('.toast').forEach(x => x.remove());
   const d = document.createElement('div'); d.className = 'toast ' + kind; d.innerHTML = ic(kind === 'ok' ? 'check' : 'alert') + '<span>' + esc(msg) + '</span>';
   document.body.appendChild(d); setTimeout(() => d.remove(), 2600);
 }
 function closeLayers() { $$('.shade,.drawer,.modal').forEach(x => x.remove()); }
-/* إغلاق أعلى نافذة فقط: إن وُجدت نافذة فوق نافذة الجهاز تُغلق هي وتبقى نافذة الجهاز */
+
 function closeOver() { $$('[data-l="2"]').forEach(x => x.remove()); }
 function closeTop() { if ($('[data-l="2"]')) closeOver(); else closeLayers(); }
 function modal({ title, hint, body, ok, danger, onOk }) {
-  const over = !!$('#vmodal');            /* مفتوحة من داخل نافذة الجهاز؟ */
+  const over = !!$('#vmodal');
   const shut = over ? closeOver : closeLayers;
   if (!over) closeLayers();
   const sh = document.createElement('div'); sh.className = 'shade'; sh.onclick = shut;
@@ -416,7 +495,6 @@ function drawer(html) {
 }
 const findVisitor = id => S.visitors.find(v => v.id === id) || (() => { const s = S.sessions.find(x => x.deviceId === id); return s ? { id, ip: s.ip, ips: [s.ip], country: s.country, device: s.device, browser: s.browser, os: s.os, lang: s.lang, visits: S.sessions.filter(x => x.deviceId === id).length, totalSecs: 0, first: s.start, last: s.last, note: '' } : null; })();
 
-/* ====== نافذة الجهاز: منبثقة من المنتصف بتبويبات ====== */
 let S_vtab = 'info';
 function vStat(id) {
   const v = findVisitor(id); if (!v) return '';
@@ -488,7 +566,7 @@ function openVisitor(id) {
   document.body.append(sh, m);
   S.openId = id;
 }
-/* نافذة منبثقة ثانية: آخر ما قام به المستخدم (مخفية حتى يضغط المشرف على الزر) */
+
 function openFeed(id) {
   const v = findVisitor(id); if (!v) return;
   closeOver();
@@ -513,11 +591,11 @@ async function doBan(key, type, value, fd) {
   const dur = +fd.get('dur') || 0;
   const reason = String(fd.get('reason') || '');
   await S.B.setControl(key, { banned: true, until: dur ? S.B.ts(Date.now() + dur) : null, reason, type, value, at: S.B.stamp(), by: S.user.email || '' });
-  /* حدّث الحالة محلياً فوراً كي يتحول الزر إلى «فك الحظر» دون انتظار الخادم */
+
   S.control[key] = Object.assign({}, S.control[key], { banned: true, until: dur ? Date.now() + dur : null, reason, type, value });
   toast(t('done')); afterCtl();
 }
-/* زر الحظر الواحد: إن كان الجهاز غير محظور يفتح نافذة الحظر، وإن كان محظوراً يطلب تأكيد فك الحظر، وهكذا */
+
 function banBtn(id) {
   const v = findVisitor(id), on = !!(v && isBanned(v));
   return `<button class="btn sm bad ${on ? 'on' : ''}" data-act="vban" data-id="${esc(id)}" title="${esc(t(on ? 'ban_btn_on' : 'ban_btn_off'))}">${ic('ban')}</button>`;
@@ -534,7 +612,7 @@ function askMsg(id) {
   modal({ title: t('m_title'), hint: t('m_hint'), body: `<div class="fld"><label>${t('m_text')}</label><textarea class="inp" name="text" maxlength="300" required></textarea></div>`, ok: t('a_confirm'),
     onOk: async fd => { await S.B.setControl('d_' + id, { message: String(fd.get('text')), msgId: String(Date.now()), msgAt: S.B.stamp() }); toast(t('done')); } });
 }
-/* ====== إرسال مهمة/ملاحظة/جدول إلى جهاز الزائر ====== */
+
 let pushTab = 'task';
 function pushBox(id) {
   const days = [t('wd_sun'), t('wd_mon'), t('wd_tue'), t('wd_wed'), t('wd_thu'), t('wd_fri'), t('wd_sat')];
@@ -558,7 +636,7 @@ async function sendPush(id, fd) {
   await S.B.setControl('d_' + id, { assign: { id: String(Date.now()), type, payload, by: S.user.email || '' } });
   toast(t('push_sent'));
 }
-/* ====== جلب بيانات الجهاز، وعرضها في قائمة منسّقة قابلة للتعديل والحذف ====== */
+
 const pullReq = id => { const c = S.control['d_' + id] || {}; return c.pull && c.pull.id ? String(c.pull.id) : ''; };
 const pullPending = id => { const rid = pullReq(id), v = findVisitor(id); return !!(rid && !(v && +v.pullId >= +rid)); };
 const opsPending = id => { const c = S.control['d_' + id] || {}, v = findVisitor(id); return !!(c.dataOps && c.dataOps.id && !(v && +v.pullId >= +c.dataOps.id)); };
@@ -573,7 +651,7 @@ function applyLocal(p, ops) {
   });
   return p;
 }
-/* البيانات كما ستكون على جهازه بعد تطبيق التعديلات التي لم تصله بعد */
+
 function viewPulled(id) {
   const v = findVisitor(id); if (!v || !v.pulled) return null;
   const p = JSON.parse(JSON.stringify(v.pulled)), c = S.control['d_' + id] || {};
@@ -659,7 +737,7 @@ function openData(id) {
   document.body.append(sh, m);
   renderDV();
 }
-/* الضغط الأول يُظهر «تأكيد؟» والثاني ينفّذ — بدون نوافذ فوق النافذة المفتوحة */
+
 function armed(el, label) {
   if (el.dataset.armed === '1') return true;
   el.dataset.armed = '1'; el.dataset.orig = el.innerHTML; el.classList.add('armed'); el.innerHTML = ic('trash') + label;
@@ -692,7 +770,6 @@ function askWipe(id) {
     onOk: async () => { await S.B.wipeUser(id, S.user.email || ''); toast(t('wipe_sent')); } });
 }
 
-/* ====== مسح سجل الأجهزة حسب وقت آخر ظهور ====== */
 const CLR_PRESETS = [['3600000', 'clr_1h'], ['21600000', 'clr_6h'], ['86400000', 'clr_1d'], ['259200000', 'clr_3d'], ['604800000', 'clr_7d'], ['2592000000', 'clr_30d'], ['0', 'clr_all'], ['custom', 'clr_custom']];
 function clrMs(fd) {
   const k = fd.get('clrsel'); if (k !== 'custom') return +k;
@@ -721,7 +798,7 @@ function askDel(id) {
   modal({ title: t('a_delete'), hint: t('sure'), ok: t('a_delete'), danger: true, onOk: async () => { const n = await S.B.deleteVisitor(id); S.visitors = S.visitors.filter(v => v.id !== id); S.sessions = S.sessions.filter(s => s.deviceId !== id); closeLayers(); toast(t('done') + ' · ' + nf(n)); renderPage(true); } });
 }
 function afterCtl() { refreshOpen(); if (S.page === 'visitors') renderTbl(); else if (S.page === 'controls') renderPage(true); else if (LIVE_PAGES.includes(S.page)) renderPage(true); }
-/* يرفع الحظر فوراً ويحدّث الأزرار دون انتظار وصول التحديث من الخادم */
+
 async function unban(...keys) {
   try {
     for (const key of keys) { await S.B.setControl(key, { banned: false }); S.control[key] = Object.assign({}, S.control[key], { banned: false }); }
@@ -759,13 +836,15 @@ function exportCsv() {
   download('novix-visitors.csv', '\ufeff' + rows.map(r => r.map(q).join(',')).join('\n'), 'text/csv;charset=utf-8');
 }
 
-/* ============================== الأحداث ============================== */
 document.addEventListener('click', async e => {
+  $$('details.dd[open]').forEach(x => { if (!x.contains(e.target) || e.target.closest('.ddm [data-act]')) x.open = false; });
+  if (document.body.classList.contains('nav-open') && !e.target.closest('.side') && !e.target.closest('[data-act="menu"]')) document.body.classList.remove('nav-open');
   const el = e.target.closest('[data-act]'); if (!el || !S.B) return;
   const a = el.dataset.act, d = el.dataset;
   if (el.tagName === 'TR' && e.target.closest('button')) return;
   switch (a) {
     case 'nav': go(d.page); break;
+    case 'vfset': S.vf = d.v; S.vShow = 50; renderTbl(); break;
     case 'menu': document.body.classList.toggle('nav-open'); break;
     case 'close': closeTop(); break;
     case 'vtab': setVTab(d.k); break;
@@ -889,26 +968,25 @@ document.addEventListener('submit', async e => {
 addEventListener('keydown', e => { if (e.key === 'Escape') closeTop(); });
 addEventListener('hashchange', () => { const p = location.hash.slice(1); if (PAGES.includes(p) && p !== S.page && S.user) { S.page = p; head(); renderPage(false); } });
 
-/* التلميحات */
 const tip = document.createElement('div'); tip.className = 'tip'; tip.style.display = 'none'; document.body.appendChild(tip);
-document.addEventListener('mousemove', e => {
+const showTip = e => {
   const el = e.target.closest && e.target.closest('[data-tip]');
   if (!el) { tip.style.display = 'none'; return; }
   const [h, ...r] = el.getAttribute('data-tip').split('|');
   tip.innerHTML = `<b>${esc(h)}</b>${r.map(x => '<br>' + esc(x)).join('')}`; tip.style.display = 'block';
   const w = tip.offsetWidth; let x = e.clientX + 14; if (x + w > innerWidth - 8) x = e.clientX - w - 14;
-  tip.style.left = x + 'px'; tip.style.top = Math.max(8, e.clientY - 12) + 'px';
-});
+  tip.style.left = Math.max(8, x) + 'px'; tip.style.top = Math.max(8, e.clientY - 12) + 'px';
+};
+document.addEventListener('pointermove', showTip); document.addEventListener('pointerdown', showTip);
 
-/* ============================== البيانات والتشغيل ============================== */
 let liveTimer = null, visTimer = null;
 function onData() {
-  const c = $('#liveCnt'); if (c) c.textContent = nf(calc().onlineDev.size);
+  updCnt();
   if (LIVE_PAGES.includes(S.page)) renderPage(true);
   else if (S.page === 'visitors' || S.page === 'sessions') renderTbl();
 }
 function watch() {
-  S.B.watchSessions(S.limit, list => { S.sessions = list; S.loaded = true; showErr(''); onData(); }, err => { console.error(err); showErr(t('conn_err')); });
+  S.B.watchSessions(S.limit, list => { const first = !S.loaded; S.sessions = list; S.loaded = true; showErr(''); first ? renderPage(false) : onData(); }, err => { console.error(err); showErr(t('conn_err')); if (!S.loaded) { S.loaded = true; renderPage(false); } });
 }
 async function loadVisitors() {
   try {
@@ -937,7 +1015,6 @@ async function startApp() {
   visTimer = setInterval(() => { if (!document.hidden) S.B.counts().then(c => { S.counts = c; }).catch(() => {}); }, 120000);
 }
 
-/* ---------- شاشات الدخول ---------- */
 const gate = html => { root.innerHTML = `<div class="gate"><div class="card box">${html}</div></div>`; };
 const logo = '<img src="../assets/img/novix-icon-256.png" alt="">';
 function showSetup() {
@@ -968,3 +1045,4 @@ async function boot() {
   });
 }
 boot();
+

@@ -25,7 +25,6 @@ const normVisitor = (id, d) => ({
 const normEvent = (id, d) => ({ id, deviceId: d.deviceId || '', sid: d.sid || '', type: d.type || '', detail: d.detail || '', at: ms(d.at) || d.cat || 0 });
 export const ipKey = ip => 'i_' + String(ip).replace(/[^a-zA-Z0-9]/g, '_');
 
-/* ======================= Firebase الحقيقي ======================= */
 export async function createFirebaseBackend() {
   const base = `https://www.gstatic.com/firebasejs/${FB}/`;
   const [A, Au, F] = await Promise.all([
@@ -62,9 +61,7 @@ export async function createFirebaseBackend() {
         s => cb(s.docs.map(d => normEvent(d.id, d.data()))), onErr);
     },
     async wipeUser(id, by) {
-      // 1) أمر المسح يصل للجهاز لحظياً (أو عند فتحه الموقع إن كان مغلقاً)
       await F.setDoc(F.doc(db, 'control', 'd_' + id), { wipeId: String(Date.now()), wipeAt: F.serverTimestamp(), wipeBy: by || '' }, { merge: true });
-      // 2) تفريغ سجل أفعاله عندي ليبدأ من الصفر (يبقى هو في قائمة الزوار)
       let n = 0;
       for (let i = 0; i < 20; i++) {
         const s = await F.getDocs(F.query(col('events'), F.where('deviceId', '==', id), F.limit(400)));
@@ -73,7 +70,7 @@ export async function createFirebaseBackend() {
       }
       return n;
     },
-    /* حذف الأنشطة (events) والجلسات (السجلات) */
+
     deleteEvent: id => F.deleteDoc(F.doc(db, 'events', id)),
     async clearEvents(deviceId) {
       let n = 0;
@@ -131,9 +128,8 @@ export async function createFirebaseBackend() {
       try { await F.deleteDoc(F.doc(db, 'control', 'd_' + id)); } catch (e) {}
       return n;
     },
-    /* مسح الأجهزة التي آخر ظهور لها أقدم من ms (أو الكل إن كان ms = 0) مع جلساتها وأحداثها، مع استثناء المعرّفات في skip */
+
     async cleanVisitors(ms, skip) {
-      // يحتاج استعلام الصفحات (startAfter) إلى orderBy صريح وإلا يرفضه Firestore بخطأ صامت تلتقطه catch أعلى — وهذا كان سبب تعطّل الزر
       const sk = new Set(skip || []), ids = [], cut = ms > 0 ? F.Timestamp.fromMillis(Date.now() - ms) : null; let last = null;
       for (let i = 0; i < 400; i++) {
         const qs = [cut ? F.where('lastSeen', '<', cut) : null, F.orderBy('lastSeen'), last ? F.startAfter(last) : null, F.limit(200)].filter(Boolean);
@@ -162,7 +158,6 @@ export async function createFirebaseBackend() {
   };
 }
 
-/* ======================= وضع تجريبي ======================= */
 export function createDemoBackend() {
   let seed = 7; const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
   const pick = (arr, w) => { const t = w.reduce((a, b) => a + b, 0); let r = rnd() * t; for (let i = 0; i < arr.length; i++) { r -= w[i]; if (r <= 0) return arr[i]; } return arr[0]; };
@@ -204,7 +199,6 @@ export function createDemoBackend() {
     }
   });
   sessions.sort((a, b) => b.last - a.last);
-  // بعض المتصلين الآن
   const liveDevs = devices.slice(0, 9);
   liveDevs.forEach((d, i) => {
     const secs = 120 + Math.floor(rnd() * 1500), v = pick(views, vw);
@@ -252,7 +246,7 @@ export function createDemoBackend() {
     stamp: () => Date.now(), ts: v => v,
     async setControl(id, data) {
       control[id] = Object.assign(control[id] || {}, data); ctlCb && ctlCb(JSON.parse(JSON.stringify(control)));
-      /* محاكاة جهاز يردّ على طلب الجلب ويطبّق أوامر التعديل/الحذف (للتجربة فقط) */
+
       if (id.startsWith('d_') && data.pull && data.pull.id) setTimeout(() => {
         const v = visitors.find(x => x.id === id.slice(2)); if (!v) return;
         if (!v.pulled) v.pulled = {
@@ -282,3 +276,4 @@ export function createDemoBackend() {
     async removeAdmin(email) { admins = admins.filter(a => a.email !== email); admCb && admCb(admins.slice()); }
   };
 }
+
