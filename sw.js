@@ -2,8 +2,8 @@ const CODE = 'novix-code';
 const MEDIA = 'novix-media';
 const FONTS = 'novix-fonts';
 const KEEP = [CODE, MEDIA, FONTS];
-const BUILD = '1794999001';
-let offlineBlock = false;   // يُضبط ديناميكياً من الصفحة عبر postMessage
+const BUILD = '1795100001';
+let offlineBlock = false;   // يُضبط ديناميكياً من الصفحة عبر postMessage، ويُحفظ في IndexedDB ليبقى بعد إعادة تشغيل العامل
 const ALL_FILES = [
 "./assets/css/fonts.css",
 "./assets/audio/fireplace.mp3",
@@ -51,6 +51,7 @@ const NET_TIMEOUT = 5000;
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
+    if (await kvGet('offlock')) return;           // الجهاز ممنوع من النسخة بدون إنترنت: لا نبني كاشاً جديداً
     const code = await caches.open(CODE);
     const media = await caches.open(MEDIA);
     await Promise.allSettled(ALL_FILES.map(async f => {
@@ -75,6 +76,7 @@ self.addEventListener('message', event => {
   if (event.data && event.data.type === 'SKIP_WAITING') self.skipWaiting();
   if (event.data && event.data.type === 'SET_OFFLINE_BLOCK') {
     offlineBlock = !!event.data.value;
+    kvPut('offlock', offlineBlock ? 1 : 0);
     // أعلم كل النوافذ المفتوحة بالتغيير
     self.clients.matchAll({ includeUncontrolled: true }).then(list => list.forEach(c => c.postMessage({ type: 'OFFLINE_BLOCK_CHANGED', value: offlineBlock })));
   }
@@ -134,8 +136,8 @@ async function cacheFirst(req) {
     if (!res || !res.ok) return;
     let changed = false;
     try { changed = (await digest(res)) !== (await digest(old)); } catch (e) { changed = true; }
-    await cache.put(req, res.clone());
-    if (changed) tellClients();
+    if (!offlineBlock) await cache.put(req, res.clone());
+    if (changed && !offlineBlock) tellClients();
   }).catch(() => {});
   return hit;
 }
@@ -144,7 +146,7 @@ async function networkFirst(req) {
   const cache = await caches.open(CODE);
   const hit = await cache.match(req, { ignoreSearch: true });
   const net = fetch(req, { cache: 'no-cache' }).then(res => {
-    if (res && res.ok) cache.put(req, res.clone());
+    if (res && res.ok && !offlineBlock) cache.put(req, res.clone());
     return res;
   });
   if (!hit) {
@@ -177,7 +179,7 @@ async function staleWhileRevalidate(req, name, maxAge) {
     if (!maxAge || Date.now() - t < maxAge) return hit;
   }
   const net = fetch(req, maxAge ? { cache: 'no-cache' } : undefined).then(res => {
-    if (res && (res.ok || res.type === 'opaque')) cache.put(req, maxAge ? stamp(res.clone()) : res.clone());
+    if (res && (res.ok || res.type === 'opaque') && !offlineBlock) cache.put(req, maxAge ? stamp(res.clone()) : res.clone());
     return res;
   }).catch(() => hit);
   return hit || net;
@@ -278,3 +280,6 @@ self.addEventListener('notificationclick', event => {
     if (w) setTimeout(() => { try { w.postMessage({ type: 'go', go }); } catch (e) {} }, 2000);
   })());
 });
+
+/* استرجاع حالة «بدون إنترنت ممنوع» المحفوظة (العامل قد يُعاد تشغيله في أي لحظة) */
+kvGet('offlock').then(v => { if (v) offlineBlock = true; });
