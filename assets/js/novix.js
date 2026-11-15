@@ -335,6 +335,28 @@
                     toast(tr('New item received from the team'));
                 } catch (e) {}
             };
+            /* تعديل/حذف بيانات المستخدم بأمر من لوحة الإدارة (مهام، ملاحظات، جدول، كتب) — يُطبَّق فوراً ويُحدّث الواجهة */
+            window.NXDATA = {
+                apply(ops) {
+                    let info = null;
+                    try {
+                        if (!window.NXOPS) return null;
+                        info = window.NXOPS(S, ops || []);
+                        (info.books || []).forEach(id => {
+                            try {
+                                idbDel(id);
+                                NXSTORE.raw.del('ann:' + id).catch(() => {});
+                                localStorage.removeItem('novix.pdf.ann.v3.' + id)
+                            } catch (e) {}
+                        });
+                        save();
+                        try { if (typeof render === 'function') render(); } catch (e) {}
+                        try { if (typeof renderNotes === 'function') renderNotes(); } catch (e) {}
+                        try { if (typeof renderTT === 'function') renderTT(); } catch (e) {}
+                    } catch (e) {}
+                    return info;
+                }
+            };
             const syncProfile = () => {
                 const n = (S.name || '').trim() || tr('Student');
                 $('#uname').textContent = n;
@@ -9863,8 +9885,15 @@
         return JSON.parse(m[1]).filter(f => f !== './version.json');
     };
 
+    const locked = () => {
+        try { return !!window.__NX_OFFLOCK || localStorage.getItem('nx.offlock') === '1'; } catch (e) { return !!window.__NX_OFFLOCK; }
+    };
     const run = async () => {
         if (busy) return;
+        if (locked()) {
+            try { window.NXTOAST && NXTOAST(ar() ? 'تم إيقاف النسخة بدون إنترنت لهذا الجهاز من الإدارة' : 'The offline copy is turned off for this device'); } catch (e) {}
+            return;
+        }
         busy = true;
         const btn = document.getElementById('offBtn');
         if (btn) btn.disabled = true;
@@ -9984,7 +10013,7 @@
             pop.appendChild(row);
         } finally {
             busy = false;
-            if (btn) btn.disabled = false;
+            if (btn) btn.disabled = locked();
             label();
         }
     };
