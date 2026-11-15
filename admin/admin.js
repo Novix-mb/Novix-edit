@@ -57,6 +57,8 @@ const IC = {
   mega: '<path d="m3 11 18-5v12L3 14v-3z"/><path d="M11.6 16.8a3 3 0 1 1-5.8-1.6"/>', wrench: '<path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.77-3.77a6 6 0 0 1-7.94 7.94l-6.91 6.91a2.12 2.12 0 0 1-3-3l6.91-6.91a6 6 0 0 1 7.94-7.94l-3.76 3.76z"/>',
   eye: '<path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8S1 12 1 12z"/><circle cx="12" cy="12" r="3"/>', bolt: '<path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/>',
   repeat: '<path d="M17 1l4 4-4 4"/><path d="M3 11V9a4 4 0 0 1 4-4h14M7 23l-4-4 4-4"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>', gear: '<circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>',
+  wifi: '<path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
+  'wifi-off': '<path d="M1 1l22 22M16.72 11.06A10.94 10.94 0 0 1 19 12.55M5 12.55a10.94 10.94 0 0 1 5.17-2.39M10.71 5.05A16 16 0 0 1 22.58 9M1.42 9a15.91 15.91 0 0 1 4.7-2.88M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/>',
   alert: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/><path d="M12 9v4M12 17h.01"/>'
 };
 const ic = n => `<svg class="i" viewBox="0 0 24 24">${IC[n] || ''}</svg>`;
@@ -78,10 +80,10 @@ function evText(e) {
   if (e.type === 'show') return t('ev_show');
   return e.type;
 }
-const evRow = (e, who) => `<div class="evr">${avt(e.deviceId, null, 30)}<div><b>${who ? esc(vName(e.deviceId) || short(e.deviceId)) : ''}</b><span>${esc(evText(e))}</span></div><small>${ago(e.at)}</small></div>`;
+const evRow = (e, who, del) => `<div class="evr">${avt(e.deviceId, null, 30)}<div><b>${who ? esc(vName(e.deviceId) || short(e.deviceId)) : ''}</b><span>${esc(evText(e))}</span></div><small>${ago(e.at)}</small>${del ? `<button class="ib evx" data-act="evdel" data-id="${esc(e.id)}" title="${esc(t('f_del'))}">${ic('trash')}</button>` : ''}</div>`;
 function pFeed() {
   const list = S.events.slice(0, 120);
-  return `<div class="card"><h3>${ic('bolt')} ${t('f_title')}<small>${nf(list.length)}</small></h3>${list.length ? `<div class="evl">${list.map(e => evRow(e, true)).join('')}</div>` : emptyBox()}</div>`;
+  return `<div class="card"><div class="tbar" style="justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">${ic('bolt')} ${t('f_title')}<small>${nf(list.length)}</small></h3>${list.length ? `<button class="btn sm bad" data-act="evclear">${ic('trash')}${t('f_clear_all')}</button>` : ''}</div>${list.length ? `<div class="evl">${list.map(e => evRow(e, true, true)).join('')}</div>` : emptyBox()}</div>`;
 }
 
 /* ============================== الحالة ============================== */
@@ -222,7 +224,7 @@ function pLive() {
   return `<div class="grid g-3">${list.map(s => `<div class="card">
     <div class="dv" style="margin-bottom:14px">${avt(s.deviceId, s.device, 40)}<span><b>${esc(vName(s.deviceId) || s.ip)}</b><small>${flag(s.country)} ${esc(cname(s.country))}</small></span><span class="pill ok" style="margin-inline-start:auto"><span class="live-dot"></span>${t('st_online')}</span></div>
     <div class="facts" style="margin-bottom:12px"><div class="fact"><small>${t('th_section')}</small><b>${esc(secLabel(s.view))}</b></div><div class="fact"><small>${t('th_dur')}</small><b>${fmtDur(s.secs)}</b></div><div class="fact"><small>${t('th_env')}</small><b>${esc(s.browser)} · ${esc(s.os)}</b></div><div class="fact"><small>${t('th_last')}</small><b>${ago(s.last)}</b></div></div>
-    <div class="row-act" style="justify-content:flex-start"><button class="btn sm" data-act="vopen" data-id="${esc(s.deviceId)}">${ic('eye')}${t('a_details')}</button><button class="btn sm" data-act="vmsg" data-id="${esc(s.deviceId)}">${ic('msg')}</button><button class="btn sm bad" data-act="vban" data-id="${esc(s.deviceId)}">${ic('ban')}</button></div>
+    <div class="row-act" style="justify-content:flex-start"><button class="btn sm" data-act="vopen" data-id="${esc(s.deviceId)}">${ic('eye')}${t('a_details')}</button><button class="btn sm" data-act="vmsg" data-id="${esc(s.deviceId)}">${ic('msg')}</button>${banBtn(s.deviceId)}</div>
   </div>`).join('')}</div>`;
 }
 
@@ -251,7 +253,7 @@ function visitorTable() {
     <td class="mono">${esc(v.ip)}${v.ips.length > 1 ? ` <small style="color:var(--muted)">+${v.ips.length - 1}</small>` : ''}</td>
     <td><span class="flag">${flag(v.country)}</span>${esc(cname(v.country))}</td>
     <td>${esc(v.browser)} · ${esc(v.os)}</td><td>${nf(v.visits)}</td><td>${fmtDur(v.totalSecs)}</td><td>${ago(v.last)}</td><td>${statusPill(v, online)}</td>
-    <td><div class="row-act"><button class="btn sm" data-act="vmsg" data-id="${esc(v.id)}" title="${t('a_message')}">${ic('msg')}</button>${isBanned(v) ? `<button class="btn sm pri" data-act="vunban" data-id="${esc(v.id)}">${t('a_unban')}</button>` : `<button class="btn sm bad" data-act="vban" data-id="${esc(v.id)}" title="${t('a_ban')}">${ic('ban')}</button>`}</div></td></tr>`).join('');
+    <td><div class="row-act"><button class="btn sm" data-act="vmsg" data-id="${esc(v.id)}" title="${t('a_message')}">${ic('msg')}</button>${banBtn(v.id)}<button class="btn sm bad" data-act="vdel" data-id="${esc(v.id)}" title="${esc(t('v_del_row'))}">${ic('trash')}</button></div></td></tr>`).join('');
   return `<div class="tw"><table><thead><tr><th>${t('th_device')}</th><th>${t('th_ip')}</th><th>${t('th_country')}</th><th>${t('th_env')}</th><th>${t('th_visits')}</th><th>${t('th_time')}</th><th>${t('th_last')}</th><th>${t('th_status')}</th><th></th></tr></thead><tbody>${rows}</tbody></table></div>
   ${list.length > S.vShow ? `<div class="more"><button class="btn" data-act="morev">${t('a_load_more')} (${nf(list.length - S.vShow)})</button></div>` : ''}`;
 }
@@ -261,17 +263,18 @@ function pVisitors() {
     <div class="search">${ic('search')}<input id="vq" value="${esc(S.vq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div>
     <select class="inp" id="vf">${opt('all', 'v_all', S.vf)}${opt('online', 'v_online', S.vf)}${opt('returning', 'v_returning', S.vf)}${opt('banned', 'v_banned', S.vf)}</select>
     <select class="inp" id="vs">${opt('last', 'sort_last', S.vs)}${opt('visits', 'sort_visits', S.vs)}${opt('time', 'sort_time', S.vs)}${opt('first', 'sort_first', S.vs)}</select>
-    <button class="btn pri" data-act="updall">${ic('bolt')}${t('a_updall')}</button><button class="btn bad" data-act="vclear">${ic('trash')}${t('a_clear')}</button><button class="btn" data-act="csv">${ic('download')}${t('a_export')}</button></div>
+    <button class="btn pri" data-act="updall">${ic('bolt')}${t('a_updall')}</button><button class="btn ${(S.control.config || {}).offlineBlock ? 'bad on' : ''}" data-act="vofflineall">${ic((S.control.config || {}).offlineBlock ? 'wifi' : 'wifi-off')}${t((S.control.config || {}).offlineBlock ? 'a_offline_out_allow' : 'a_offline_out_block')}</button><button class="btn bad" data-act="vclear">${ic('trash')}${t('a_clear')}</button><button class="btn bad" data-act="vclearall">${ic('trash')}${t('v_clear_all')}</button><button class="btn" data-act="csv">${ic('download')}${t('a_export')}</button></div>
     <div id="tbl">${visitorTable()}</div></div>`;
 }
 
-function sessionTable(list, withMore) {
+function sessionTable(list, del) {
   if (!list.length) return emptyBox();
+  del = del !== false;
   const rows = list.map(s => `<tr class="click" data-act="sopen" data-id="${esc(s.id)}">
     <td>${dtm(s.start)}</td><td class="mono">${esc(s.ip)}</td><td><span class="flag">${flag(s.country)}</span>${esc(cname(s.country))}</td>
     <td><span class="dv"><span class="ico" style="width:28px;height:28px;border-radius:9px">${devIc(s.device)}</span>${esc(s.browser)}</span></td>
-    <td>${fmtDur(s.secs)}</td><td>${esc(secLabel(s.view))}</td><td>${nf(Object.values(s.acts).reduce((x, y) => x + y, 0))}</td><td>${esc(s.ref || '—')}</td></tr>`).join('');
-  return `<div class="tw"><table><thead><tr><th>${t('th_start')}</th><th>${t('th_ip')}</th><th>${t('th_country')}</th><th>${t('th_device')}</th><th>${t('th_dur')}</th><th>${t('th_section')}</th><th>${t('th_used')}</th><th>${t('th_ref')}</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+    <td>${fmtDur(s.secs)}</td><td>${esc(secLabel(s.view))}</td><td>${nf(Object.values(s.acts).reduce((x, y) => x + y, 0))}</td><td>${esc(s.ref || '—')}</td>${del ? `<td><button class="btn sm bad" data-act="sdel" data-id="${esc(s.id)}" title="${esc(t('s_del'))}">${ic('trash')}</button></td>` : ''}</tr>`).join('');
+  return `<div class="tw"><table><thead><tr><th>${t('th_start')}</th><th>${t('th_ip')}</th><th>${t('th_country')}</th><th>${t('th_device')}</th><th>${t('th_dur')}</th><th>${t('th_section')}</th><th>${t('th_used')}</th><th>${t('th_ref')}</th>${del ? '<th></th>' : ''}</tr></thead><tbody>${rows}</tbody></table></div>`;
 }
 function sessionsBody() {
   const a = calc(), q = S.sq.trim().toLowerCase();
@@ -279,7 +282,7 @@ function sessionsBody() {
   return sessionTable(list.slice(0, S.sShow)) + (list.length > S.sShow ? `<div class="more"><button class="btn" data-act="mores">${t('a_load_more')} (${nf(list.length - S.sShow)})</button></div>` : '') + limitNote();
 }
 function pSessions() {
-  return `<div class="card"><div class="tbar"><div class="search">${ic('search')}<input id="sq" value="${esc(S.sq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div></div><div id="tbl">${sessionsBody()}</div></div>`;
+  return `<div class="card"><div class="tbar"><div class="search">${ic('search')}<input id="sq" value="${esc(S.sq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div><button class="btn bad" data-act="sclear">${ic('trash')}${t('s_clear_all')}</button></div><div id="tbl">${sessionsBody()}</div></div>`;
 }
 
 function pUsage() {
@@ -309,6 +312,9 @@ function pControls() {
     <div class="hint-box">${ic('alert')} ${t('b_hint')}</div></div>
   <div class="card"><div class="ctl-h" style="--c:var(--acc3)"><span class="ic">${ic('refresh')}</span><div><b>${t('ctl_upd')}</b><small>${t('ctl_upd_sub')}</small></div></div>
     <button class="btn pri" data-act="updall">${ic('bolt')}${t('ctl_upd_all')}</button></div>
+  <div class="card"><div class="ctl-h" style="--c:var(--bad)"><span class="ic">${ic('wifi-off')}</span><div><b>${t('ctl_offline')}</b><small>${t('ctl_offline_sub')}</small></div><label class="sw"><input type="checkbox" id="offAllOn" ${cfg.offlineBlock ? 'checked' : ''}><i></i></label></div>
+    <div class="hint-box">${ic('alert')} ${t(cfg.offlineBlock ? 'ctl_offline_on' : 'ctl_offline_off')}</div></div></div>
+  <div class="grid g-2e">
   <div class="card"><h3>${ic('ban')} ${t('ctl_addban')}</h3><form data-form="banip"><div class="inl"><div class="fld"><label>${t('ctl_ip')}</label><input class="inp mono" name="ip" required maxlength="45" placeholder="41.34.12.9"></div>
     <div class="fld"><label>${t('b_dur')}</label><select class="inp" name="dur" style="width:100%"><option value="3600000">${t('b_1h')}</option><option value="86400000">${t('b_24h')}</option><option value="604800000">${t('b_7d')}</option><option value="0" selected>${t('b_forever')}</option></select></div></div>
     <div class="fld" style="margin-top:12px"><label>${t('b_reason')}</label><input class="inp" name="reason" maxlength="120"></div><button class="btn bad" type="submit">${ic('ban')}${t('a_banip')}</button></form></div></div>
@@ -488,7 +494,7 @@ function openFeed(id) {
   closeOver();
   const sh = document.createElement('div'); sh.className = 'shade l2'; sh.dataset.l = '2'; sh.onclick = closeOver;
   const m = document.createElement('div'); m.className = 'modal l2'; m.dataset.l = '2';
-  m.innerHTML = `<div class="box vm vfeedbox"><div class="vhead"><div class="dh" style="margin-bottom:0"><span class="dv">${avt(id, v.device, 40)}</span><div style="flex:1;min-width:0"><h2>${t('d_lastact_title')}</h2><small style="color:var(--muted)">${esc(v.name || short(v.id))}</small></div><button class="ib" data-act="close">${ic('x')}</button></div></div>
+  m.innerHTML = `<div class="box vm vfeedbox"><div class="vhead"><div class="dh" style="margin-bottom:0"><span class="dv">${avt(id, v.device, 40)}</span><div style="flex:1;min-width:0"><h2>${t('d_lastact_title')}</h2><small style="color:var(--muted)">${esc(v.name || short(v.id))}</small></div><button class="btn sm bad" data-act="evclearDev" data-id="${esc(id)}" title="${esc(t('f_clear_dev_hint'))}">${ic('trash')}${t('f_clear_dev')}</button><button class="ib" data-act="close">${ic('x')}</button></div></div>
     <div class="vbody"><div class="evl" id="vfeed">${feedFor(id)}</div></div></div>`;
   document.body.append(sh, m);
   S.feedId = id;
@@ -505,9 +511,23 @@ function openSession(id) {
 const durOpts = () => `<div class="fld"><label>${t('b_dur')}</label><select class="inp" name="dur" style="width:100%"><option value="3600000">${t('b_1h')}</option><option value="86400000">${t('b_24h')}</option><option value="604800000">${t('b_7d')}</option><option value="0" selected>${t('b_forever')}</option></select></div><div class="fld"><label>${t('b_reason')}</label><input class="inp" name="reason" maxlength="120"></div>`;
 async function doBan(key, type, value, fd) {
   const dur = +fd.get('dur') || 0;
-  await S.B.setControl(key, { banned: true, until: dur ? S.B.ts(Date.now() + dur) : null, reason: String(fd.get('reason') || ''), type, value, at: S.B.stamp(), by: S.user.email || '' });
-  toast(t('done'));
+  const reason = String(fd.get('reason') || '');
+  await S.B.setControl(key, { banned: true, until: dur ? S.B.ts(Date.now() + dur) : null, reason, type, value, at: S.B.stamp(), by: S.user.email || '' });
+  /* حدّث الحالة محلياً فوراً كي يتحول الزر إلى «فك الحظر» دون انتظار الخادم */
+  S.control[key] = Object.assign({}, S.control[key], { banned: true, until: dur ? Date.now() + dur : null, reason, type, value });
+  toast(t('done')); afterCtl();
 }
+/* زر الحظر الواحد: إن كان الجهاز غير محظور يفتح نافذة الحظر، وإن كان محظوراً يطلب تأكيد فك الحظر، وهكذا */
+function banBtn(id) {
+  const v = findVisitor(id), on = !!(v && isBanned(v));
+  return `<button class="btn sm bad ${on ? 'on' : ''}" data-act="vban" data-id="${esc(id)}" title="${esc(t(on ? 'ban_btn_on' : 'ban_btn_off'))}">${ic('ban')}</button>`;
+}
+function toggleBan(id) { const v = findVisitor(id); if (!v) return; if (isBanned(v)) askUnban(id); else askBan(id); }
+function askUnban(id) {
+  const nm = vName(id) || short(id);
+  modal({ title: t('unban_title') + ' · ' + nm, hint: t('unban_hint'), ok: t('a_unban'), onOk: async () => { await unbanVisitor(id); } });
+}
+function askUnbanKeys(keys) { modal({ title: t('unban_title'), hint: t('unban_key_hint'), ok: t('a_unban'), onOk: async () => { await unban(...keys); } }); }
 function askBan(id) { modal({ title: t('b_title'), hint: t('b_hint'), body: durOpts(), ok: t('a_ban'), danger: true, onOk: fd => doBan('d_' + id, 'device', id, fd) }); }
 function askBanIp(ip) { modal({ title: t('b_title') + ' · ' + ip, hint: t('b_hint'), body: durOpts(), ok: t('a_banip'), danger: true, onOk: fd => doBan(ipKey(ip), 'ip', ip, fd) }); }
 function askMsg(id) {
@@ -538,36 +558,133 @@ async function sendPush(id, fd) {
   await S.B.setControl('d_' + id, { assign: { id: String(Date.now()), type, payload, by: S.user.email || '' } });
   toast(t('push_sent'));
 }
-/* ====== جلب بيانات الجهاز: ملفاته المرفوعة ومهامه وملاحظاته وجدوله ورسومه على السبورة ====== */
+/* ====== جلب بيانات الجهاز، وعرضها في قائمة منسّقة قابلة للتعديل والحذف ====== */
+const pullReq = id => { const c = S.control['d_' + id] || {}; return c.pull && c.pull.id ? String(c.pull.id) : ''; };
+const pullPending = id => { const rid = pullReq(id), v = findVisitor(id); return !!(rid && !(v && +v.pullId >= +rid)); };
+const opsPending = id => { const c = S.control['d_' + id] || {}, v = findVisitor(id); return !!(c.dataOps && c.dataOps.id && !(v && +v.pullId >= +c.dataOps.id)); };
+function applyLocal(p, ops) {
+  (ops || []).forEach(op => {
+    if (!op) return;
+    if (op.c === 'board') { if (op.a === 'clear') p.board = { pages: 0, items: 0 }; return; }
+    const arr = p[op.c]; if (!Array.isArray(arr)) return;
+    if (op.a === 'clear') { arr.length = 0; return; }
+    const i = arr.findIndex(x => String(x.id) === String(op.id)); if (i < 0) return;
+    if (op.a === 'del') arr.splice(i, 1); else if (op.a === 'set') Object.assign(arr[i], op.v || {});
+  });
+  return p;
+}
+/* البيانات كما ستكون على جهازه بعد تطبيق التعديلات التي لم تصله بعد */
+function viewPulled(id) {
+  const v = findVisitor(id); if (!v || !v.pulled) return null;
+  const p = JSON.parse(JSON.stringify(v.pulled)), c = S.control['d_' + id] || {};
+  if (opsPending(id)) applyLocal(p, c.dataOps.ops);
+  return p;
+}
+async function sendOps(id, newOps) {
+  const c = S.control['d_' + id] || {};
+  const prev = opsPending(id) ? (c.dataOps.ops || []) : [];
+  const ops = JSON.parse(JSON.stringify(prev.concat(newOps).slice(-150))), rid = String(Date.now());
+  const patch = { dataOps: { id: rid, ops }, pull: { id: rid } };
+  await S.B.setControl('d_' + id, patch);
+  S.control['d_' + id] = Object.assign({}, c, patch);
+  refreshOpen(); toast(t('dv_sent'));
+}
 function pullBox(id) {
   const v = findVisitor(id); if (!v) return '';
-  const reqId = ((S.control['d_' + id] || {}).pull || {}).id;
-  const pending = !!(reqId && String(v.pullId || '') !== String(reqId));
-  let out = `<button class="btn sm ${pending ? '' : 'pri'}" data-act="vfetch" data-id="${esc(id)}" ${pending ? 'disabled' : ''}>${ic('refresh')}${pending ? t('pull_wait') : t('d_fetch')}</button>`;
-  if (pending) { out += `<small class="vhint">${t('pull_wait_hint')}</small>`; return out; }
-  const p = v.pulled;
-  if (!p) return out + `<small class="vhint">${t('pull_none')}</small>`;
-  const has = (p.tasks && p.tasks.length) || (p.notes && p.notes.length) || (p.sched && p.sched.length) || (p.books && p.books.length) || (p.board && p.board.items);
-  out += `<small class="vhint">${t('pull_at', { d: dtm(v.pulledAt) })}</small><div class="vpulled">`;
-  if (p.tasks && p.tasks.length) out += `<div class="dsec">${t('pull_tasks')} · ${p.tasks.length}</div><div class="chips">${p.tasks.slice(0, 60).map(x => `<span class="chip">${x.d ? ic('check') : ''}${esc(x.t)}</span>`).join('')}</div>`;
-  if (p.notes && p.notes.length) out += `<div class="dsec">${t('pull_notes')} · ${p.notes.length}</div>${p.notes.slice(0, 30).map(n => `<div class="sl"><span>${esc(n.title || t('push_note_title'))}${n.pin ? ' 📌' : ''}</span><b class="mono" style="font-weight:400;color:var(--muted)">${esc((n.body || '').slice(0, 70))}</b></div>`).join('')}`;
-  if (p.sched && p.sched.length) out += `<div class="dsec">${t('pull_sched')} · ${p.sched.length}</div><div class="chips">${p.sched.slice(0, 40).map(x => `<span class="chip">${esc(x.t)}${x.time ? ' · ' + esc(x.time) : ''}</span>`).join('')}</div>`;
-  if (p.books && p.books.length) out += `<div class="dsec">${t('pull_books')} · ${p.books.length}</div><div class="chips">${p.books.slice(0, 40).map(b => `<span class="chip">${esc(b.t || b.fn || '—')}${b.s ? ' · ' + esc(b.s) : ''} · ${kb(b.size)}</span>`).join('')}</div>`;
-  if (p.board && p.board.items) out += `<div class="dsec">${t('pull_board')}</div><div class="chips"><span class="chip">${t('pull_board_pages', { n: nf(p.board.pages || 0) })}</span><span class="chip">${t('pull_board_items', { n: nf(p.board.items || 0) })}</span></div>`;
-  if (!has) out += `<div class="vhint">${t('pull_empty')}</div>`;
-  return out + `</div>`;
+  const rid = pullReq(id), pending = pullPending(id), online = calc().onlineDev.has(id);
+  const age = rid ? Math.max(0, (Date.now() - (+rid || Date.now())) / 1000) : 0;
+  const errCode = v.pullErr && rid && v.pullErr.startsWith(rid + ':') ? v.pullErr.slice(rid.length + 1) : '';
+  const p = v.pulled, viewBtn = p ? `<div style=\"margin-top:12px\"><button class=\"btn sm pri\" data-act=\"vdata\" data-id=\"${esc(id)}\">${ic('eye')}${t('pull_view')}</button></div>` : '';
+  if (pending) {
+    return `<div class=\"pullst\"><span class=\"live-dot\"></span><div><b>${t(online ? 'pull_wait_online' : 'pull_wait_off')}</b><small>${t('pull_elapsed', { d: fmtDur(age) })}</small></div></div>`
+      + (errCode ? `<div class=\"hint-box\" style=\"margin-top:10px\">${ic('alert')} ${esc(t('pull_err', { e: errCode }))}</div>` : (online && age > 45 ? `<div class=\"hint-box\" style=\"margin-top:10px\">${ic('alert')} ${t('pull_slow')}</div>` : ''))
+      + `<div class=\"vupd\" style=\"margin-top:10px\"><button class=\"btn sm\" data-act=\"vfetch\" data-id=\"${esc(id)}\">${ic('refresh')}${t('pull_retry')}</button><button class=\"btn sm bad\" data-act=\"vfetchcancel\" data-id=\"${esc(id)}\">${ic('x')}${t('pull_cancel')}</button></div>` + viewBtn;
+  }
+  let out = `<button class=\"btn sm pri\" data-act=\"vfetch\" data-id=\"${esc(id)}\">${ic('refresh')}${t('d_fetch')}</button>`;
+  if (!p) return out + `<small class=\"vhint\">${t('pull_none')}</small>`;
+  const n = k => (p[k] || []).length, chips = [['tasks', 'pull_tasks'], ['notes', 'pull_notes'], ['sched', 'pull_sched'], ['books', 'pull_books']].filter(([k]) => n(k)).map(([k, l]) => `<span class=\"chip\">${t(l)} · ${nf(n(k))}</span>`);
+  if (p.board && p.board.items) chips.push(`<span class=\"chip\">${t('pull_board')} · ${nf(p.board.items)}</span>`);
+  out += `<small class=\"vhint\">${t('pull_at', { d: dtm(v.pulledAt) })}</small>`;
+  out += chips.length ? `<div class=\"chips\" style=\"margin-top:10px\">${chips.join('')}</div>` : `<div class=\"vhint\">${t('pull_empty')}</div>`;
+  return out + viewBtn;
+}
+
+const DV_TABS = [['tasks', 'pull_tasks'], ['notes', 'pull_notes'], ['sched', 'pull_sched'], ['books', 'pull_books'], ['board', 'dv_board']];
+const dvCount = (p, k) => k === 'board' ? ((p.board && p.board.items) || 0) : (p[k] || []).length;
+const dvDay = i => t('wd_' + ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'][+i || 0]);
+const dvDiff = x => t(x === 'Low' ? 'push_diff_low' : x === 'High' ? 'push_diff_high' : 'push_diff_med');
+const dvBtns = (c, x) => x.tr ? `<small class=\"vhint\" style=\"margin:0\">${t('dv_trunc')}</small><button class=\"btn sm bad\" data-act=\"dvdel\" data-c=\"${c}\" data-item=\"${x.id}\">${ic('trash')}</button>`
+  : `<button class=\"btn sm\" data-act=\"dvedit\" data-c=\"${c}\" data-item=\"${x.id}\" title=\"${esc(t('dv_edit'))}\">${ic('gear')}</button><button class=\"btn sm bad\" data-act=\"dvdel\" data-c=\"${c}\" data-item=\"${x.id}\" title=\"${esc(t('dv_del'))}\">${ic('trash')}</button>`;
+const dvSave = (c, x) => `<div class=\"row-act\" style=\"justify-content:flex-start\"><button class=\"btn sm pri\" data-act=\"dvsave\" data-c=\"${c}\" data-item=\"${x.id}\">${ic('check')}${t('dv_save')}</button><button class=\"btn sm\" data-act=\"dvcancel\">${t('dv_cancel')}</button></div>`;
+function dvRow(c, x) {
+  const ed = S.dv.edit && S.dv.edit.c === c && String(S.dv.edit.id) === String(x.id);
+  if (!x.id) return `<div class=\"dvr\"><div class=\"dvmain\"><b>${esc(x.t || x.title || '—')}</b><small>${t('dv_noid')}</small></div></div>`;
+  if (c === 'tasks') {
+    if (ed) return `<div class=\"dvr editing\"><div class=\"dvform\"><label>${t('dv_task_text')}</label><input class=\"inp\" data-f=\"t\" maxlength=\"160\" value=\"${esc(x.t)}\"><div class=\"dvgrid\"><select class=\"inp\" data-f=\"p\">${['Low', 'Medium', 'High'].map(k => `<option value=\"${k}\" ${x.p === k ? 'selected' : ''}>${dvDiff(k)}</option>`).join('')}</select><label class=\"chk\" style=\"display:flex;gap:8px;align-items:center;color:var(--text)\"><input type=\"checkbox\" data-f=\"d\" ${x.d ? 'checked' : ''}> ${t('dv_done')}</label></div></div>${dvSave(c, x)}</div>`;
+    return `<div class=\"dvr\"><span class=\"dvchk ${x.d ? 'on' : ''}\">${x.d ? ic('check') : ''}</span><div class=\"dvmain\"><b class=\"${x.d ? 'dn' : ''}\">${esc(x.t)}</b><small>${esc(dvDiff(x.p))}${x.d ? ' · ' + t('dv_done') : ''}</small></div><div class=\"row-act\">${dvBtns(c, x)}</div></div>`;
+  }
+  if (c === 'notes') {
+    if (ed) return `<div class=\"dvr editing\"><div class=\"dvform\"><label>${t('dv_note_title')}</label><input class=\"inp\" data-f=\"title\" maxlength=\"100\" value=\"${esc(x.title)}\"><label>${t('dv_note_body')}</label><textarea class=\"inp\" data-f=\"body\" maxlength=\"1500\" style=\"min-height:110px\">${esc(x.body)}</textarea><label class=\"chk\" style=\"display:flex;gap:8px;align-items:center;color:var(--text)\"><input type=\"checkbox\" data-f=\"pin\" ${x.pin ? 'checked' : ''}> ${t('dv_pin')}</label></div>${dvSave(c, x)}</div>`;
+    return `<div class=\"dvr\"><div class=\"dvmain\"><b>${esc(x.title || t('push_note_title'))}${x.pin ? ' 📌' : ''}</b><small>${esc((x.body || '').slice(0, 220))}</small></div><div class=\"row-act\">${dvBtns(c, x)}</div></div>`;
+  }
+  if (c === 'sched') {
+    if (ed) return `<div class=\"dvr editing\"><div class=\"dvform\"><label>${t('dv_sched_text')}</label><input class=\"inp\" data-f=\"t\" maxlength=\"100\" value=\"${esc(x.t)}\"><div class=\"dvgrid\"><div><label>${t('dv_day')}</label><select class=\"inp\" data-f=\"day\">${[0, 1, 2, 3, 4, 5, 6].map(i => `<option value=\"${i}\" ${+x.day === i ? 'selected' : ''}>${dvDay(i)}</option>`).join('')}</select></div><div><label>${t('dv_time')}</label><input class=\"inp\" type=\"time\" data-f=\"time\" value=\"${esc(x.time || '')}\"></div></div></div>${dvSave(c, x)}</div>`;
+    return `<div class=\"dvr\"><div class=\"dvmain\"><b>${esc(x.t)}</b><small>${esc(dvDay(x.day))}${x.time ? ' · ' + esc(x.time) : ''}</small></div><div class=\"row-act\">${dvBtns(c, x)}</div></div>`;
+  }
+  if (ed) return `<div class=\"dvr editing\"><div class=\"dvform\"><label>${t('dv_book_title')}</label><input class=\"inp\" data-f=\"t\" maxlength=\"120\" value=\"${esc(x.t)}\"><label>${t('dv_book_subj')}</label><input class=\"inp\" data-f=\"s\" maxlength=\"60\" value=\"${esc(x.s)}\"></div>${dvSave(c, x)}</div>`;
+  return `<div class=\"dvr\"><div class=\"dvmain\"><b>${esc(x.t || x.fn || '—')}</b><small>${esc(x.s || '')}${x.s ? ' · ' : ''}${kb(x.size)}${x.ty ? ' · ' + esc(x.ty) : ''}</small></div><div class=\"row-act\">${dvBtns(c, x)}</div></div>`;
+}
+function renderDV() {
+  const box = $('#dvbody'); if (!S.dv || !box) return;
+  const id = S.dv.id, p = viewPulled(id) || {}, k = S.dv.tab;
+  const st = $('#dvstat'); if (st) st.innerHTML = opsPending(id) ? `<span class=\"pill wr\"><span class=\"live-dot\"></span>${t('dv_pending')}</span>` : (findVisitor(id) && findVisitor(id).pulledAt ? `<span class=\"pill ok\">${ic('check')}${t('dv_fetched')} · ${dtm(findVisitor(id).pulledAt)}</span>` : '');
+  const tb = $('#dvtabs'); if (tb) tb.innerHTML = DV_TABS.map(([key, l]) => `<button type=\"button\" data-act=\"dvtab\" data-k=\"${key}\" class=\"${k === key ? 'on' : ''}\">${t(l)} <small>${nf(dvCount(p, key))}</small></button>`).join('');
+  let h = '';
+  if (k === 'board') {
+    h = dvCount(p, 'board') ? `<div class=\"chips\"><span class=\"chip\">${nf(p.board.pages || 0)} ${t('dv_pages')}</span><span class=\"chip\">${nf(p.board.items || 0)} ${t('dv_items')}</span></div><div style=\"margin-top:14px\"><button class=\"btn sm bad\" data-act=\"dvboard\">${ic('trash')}${t('dv_board_clear')}</button></div><small class=\"vhint\">${t('dv_board_warn')}</small>` : emptyMsg();
+  } else {
+    const list = p[k] || [];
+    h = list.length ? `<div class=\"dvhead\"><small style=\"color:var(--muted)\">${nf(list.length)}</small><button class=\"btn sm bad\" data-act=\"dvclear\" data-c=\"${k}\">${ic('trash')}${t('dv_clear')}</button></div>${k === 'books' ? `<small class=\"vhint\" style=\"margin:0 0 10px\">${t('dv_book_warn')}</small>` : ''}${list.map(x => dvRow(k, x)).join('')}` : emptyMsg();
+  }
+  box.innerHTML = h;
+}
+const emptyMsg = () => `<div class=\"empty\">${t('dv_empty')}</div>`;
+function openData(id) {
+  const v = findVisitor(id); if (!v) return;
+  closeOver();
+  S.dv = { id, tab: (S.dv && S.dv.id === id && S.dv.tab) || 'tasks', edit: null };
+  const sh = document.createElement('div'); sh.className = 'shade l2'; sh.dataset.l = '2'; sh.onclick = closeOver;
+  const m = document.createElement('div'); m.className = 'modal l2'; m.dataset.l = '2';
+  m.innerHTML = `<div class=\"box vm vdatabox\"><div class=\"vhead\"><div class=\"dh\" style=\"margin-bottom:0\"><span class=\"dv\">${avt(id, v.device, 40)}</span><div style=\"flex:1;min-width:0\"><h2>${t('dv_title')}</h2><small style=\"color:var(--muted)\">${esc(v.name || short(v.id))}</small></div><button class=\"ib\" data-act=\"close\">${ic('x')}</button></div><div class=\"vstat\" id=\"dvstat\"></div><div class=\"vtabs\" id=\"dvtabs\"></div></div><div class=\"vbody\" id=\"dvbody\"></div></div>`;
+  document.body.append(sh, m);
+  renderDV();
+}
+/* الضغط الأول يُظهر «تأكيد؟» والثاني ينفّذ — بدون نوافذ فوق النافذة المفتوحة */
+function armed(el, label) {
+  if (el.dataset.armed === '1') return true;
+  el.dataset.armed = '1'; el.dataset.orig = el.innerHTML; el.classList.add('armed'); el.innerHTML = ic('trash') + label;
+  setTimeout(() => { if (el.isConnected && el.dataset.armed === '1') { el.dataset.armed = ''; el.innerHTML = el.dataset.orig; el.classList.remove('armed'); } }, 3200);
+  return false;
+}
+function dvCollect(c, row) {
+  const g = f => { const e = row.querySelector('[data-f="' + f + '"]'); return e ? (e.type === 'checkbox' ? (e.checked ? 1 : 0) : e.value) : undefined; };
+  if (c === 'tasks') return { t: String(g('t') || '').trim(), p: g('p'), d: g('d') };
+  if (c === 'notes') return { title: String(g('title') || '').trim(), body: String(g('body') || ''), pin: g('pin') };
+  if (c === 'sched') return { t: String(g('t') || '').trim(), day: +g('day') || 0, time: g('time') || '' };
+  return { t: String(g('t') || '').trim(), s: String(g('s') || '').trim() };
 }
 function wipeBox(id) {
   const w = wipeState(id); if (!w) return '';
   return `<div class="hint-box" style="margin:14px 0">${w.done ? ic('check') + ' ' + t('wipe_done_at', { d: dtm(w.at) }) : ic('alert') + ' ' + t('wipe_wait')}</div>`;
 }
-const feedFor = id => { const l = S.events.filter(e => e.deviceId === id).slice(0, 25); return l.length ? l.map(e => evRow(e, false)).join('') : `<small style="color:var(--muted)">${t('f_none')}</small>`; };
+const feedFor = id => { const l = S.events.filter(e => e.deviceId === id).slice(0, 25); return l.length ? l.map(e => evRow(e, false, true)).join('') : `<small style="color:var(--muted)">${t('f_none')}</small>`; };
 function refreshOpen() {
   if (!S.openId || !$('#vmodal')) { S.openId = null; } else {
     const id = S.openId, set = (sel, html) => { const el = $(sel); if (el) el.innerHTML = html; };
     set('#vwipe', wipeBox(id)); set('#vstat', vStat(id)); set('#vupd', vUpd(id)); set('#vacts', vActs(id)); set('#vpull', pullBox(id)); set('#voffline', offlineBtns(id, !!(S.control['d_' + id] || {}).offlineBlock));
   }
   const fe = $('#vfeed'); if (fe && S.feedId) fe.innerHTML = feedFor(S.feedId);
+  if (S.dv && $('#dvbody')) { if (!S.dv.edit) renderDV(); } else S.dv = null;
 }
 function askWipe(id) {
   const v = vis(id), nm = (v && v.name) || short(id);
@@ -582,9 +699,9 @@ function clrMs(fd) {
   const n = Math.max(1, +fd.get('clrn') || 1); return n * ({ m: 60e3, h: 3600e3, d: 864e5 }[fd.get('clru')] || 864e5);
 }
 function clrTargets(ms, keep) { const cut = Date.now() - ms; return S.visitors.filter(v => (ms > 0 ? (v.last || 0) < cut : true) && !(keep && isBanned(v))); }
-function askClearVisitors() {
+function askClearVisitors(def = '86400000') {
   modal({ title: t('clr_title'), hint: t('clr_hint'), ok: t('clr_ok'), danger: true,
-    body: `<div class="fld"><label>${t('clr_older')}</label><select class="inp" name="clrsel" id="clrsel">${CLR_PRESETS.map(([v, k]) => `<option value="${v}" ${v === '86400000' ? 'selected' : ''}>${t(k)}</option>`).join('')}</select></div>
+    body: `<div class="fld"><label>${t('clr_older')}</label><select class="inp" name="clrsel" id="clrsel">${CLR_PRESETS.map(([v, k]) => `<option value="${v}" ${v === def ? 'selected' : ''}>${t(k)}</option>`).join('')}</select></div>
       <div class="fld" id="clrcus" style="display:none"><div style="display:flex;gap:8px"><input class="inp" type="number" min="1" name="clrn" id="clrn" value="1" style="flex:1"><select class="inp" name="clru" id="clru" style="flex:1"><option value="m">${t('clr_u_m')}</option><option value="h">${t('clr_u_h')}</option><option value="d" selected>${t('clr_u_d')}</option></select></div></div>
       <label class="chk" style="display:flex;gap:8px;align-items:center;margin:6px 0 12px;cursor:pointer"><input type="checkbox" name="keepban" id="clrkeep" checked> <span>${t('clr_keep')}</span></label>
       <div class="vhint" id="clrcnt" style="font-weight:700"></div>`,
@@ -603,7 +720,7 @@ function askClearVisitors() {
 function askDel(id) {
   modal({ title: t('a_delete'), hint: t('sure'), ok: t('a_delete'), danger: true, onOk: async () => { const n = await S.B.deleteVisitor(id); S.visitors = S.visitors.filter(v => v.id !== id); S.sessions = S.sessions.filter(s => s.deviceId !== id); closeLayers(); toast(t('done') + ' · ' + nf(n)); renderPage(true); } });
 }
-function afterCtl() { refreshOpen(); if (S.page === 'visitors') renderTbl(); else if (S.page === 'controls') renderPage(true); }
+function afterCtl() { refreshOpen(); if (S.page === 'visitors') renderTbl(); else if (S.page === 'controls') renderPage(true); else if (LIVE_PAGES.includes(S.page)) renderPage(true); }
 /* يرفع الحظر فوراً ويحدّث الأزرار دون انتظار وصول التحديث من الخادم */
 async function unban(...keys) {
   try {
@@ -616,6 +733,21 @@ function unbanVisitor(id) {
   const keys = []; if (banActive(S.control['d_' + id])) keys.push('d_' + id); if (v.ip && banActive(S.control[ipKey(v.ip)])) keys.push(ipKey(v.ip));
   return unban(...keys);
 }
+
+function askOfflineAll() {
+  const globalOb = !!(S.control.config || {}).offlineBlock;
+  modal({ title: t(globalOb ? 'offline_all_on_title' : 'offline_all_off_title'),
+    hint: t(globalOb ? 'offline_all_on_hint' : 'offline_all_off_hint'),
+    ok: t(globalOb ? 'a_offline_all_allow' : 'a_offline_all_block'), danger: !globalOb,
+    onOk: async () => {
+      await S.B.setControl('config', { offlineBlock: !globalOb });
+      S.control.config = Object.assign({}, S.control.config, { offlineBlock: !globalOb });
+      toast(t(globalOb ? 'offline_all_now_allowed' : 'offline_all_now_blocked')); afterCtl();
+      if (S.page === 'visitors') renderPage(true);
+    }
+  });
+}
+const afterEv = () => { if (S.page === 'feed') renderPage(true); refreshOpen(); };
 
 function download(name, text, type) {
   const a = document.createElement('a'); a.href = URL.createObjectURL(new Blob([text], { type })); a.download = name; a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 4000);
@@ -646,12 +778,12 @@ document.addEventListener('click', async e => {
     case 'vopen': openVisitor(d.id); break;
     case 'sopen': openSession(d.id); break;
     case 'vmsg': askMsg(d.id); break;
-    case 'vban': askBan(d.id); break;
+    case 'vban': toggleBan(d.id); break;
     case 'vbanip': askBanIp(d.ip); break;
     case 'vdel': askDel(d.id); break;
     case 'vwipe': askWipe(d.id); break;
-    case 'unban': await unban(d.key); break;
-    case 'vunban': await unbanVisitor(d.id); break;
+    case 'unban': askUnbanKeys([d.key]); break;
+    case 'vunban': toggleBan(d.id); break;
     case 'vnote': { const v = $('#vnote'); try { await S.B.setVisitorNote(d.id, v.value.trim()); const x = S.visitors.find(z => z.id === d.id); if (x) x.note = v.value.trim(); toast(t('saved')); } catch (x) { toast(t('failed'), 'bad'); } break; }
     case 'pushtab': pushTab = d.k; refreshPush(d.id); break;
     case 'voffline': {
@@ -663,18 +795,7 @@ document.addEventListener('click', async e => {
       } catch (e) { toast(t('failed'), 'bad'); }
       break;
     }
-    case 'vofflineall': {
-      const globalOb = !!(S.control.config || {}).offlineBlock;
-      modal({ title: t(globalOb ? 'offline_all_on_title' : 'offline_all_off_title'),
-        hint: t(globalOb ? 'offline_all_on_hint' : 'offline_all_off_hint'),
-        ok: t(globalOb ? 'a_offline_all_allow' : 'a_offline_all_block'), danger: !globalOb,
-        onOk: async () => {
-          await S.B.setControl('config', { offlineBlock: !globalOb });
-          S.control.config = Object.assign({}, S.control.config, { offlineBlock: !globalOb });
-          toast(t(globalOb ? 'offline_all_now_allowed' : 'offline_all_now_blocked')); afterCtl();
-        }
-      }); break;
-    }
+    case 'vofflineall': askOfflineAll(); break;
     case 'vfetch': {
       const rid = String(Date.now());
       try {
@@ -684,6 +805,43 @@ document.addEventListener('click', async e => {
       } catch (e) { toast(t('failed'), 'bad'); }
       break;
     }
+    case 'vfetchcancel': {
+      try {
+        const patch = { pull: { id: '' }, dataOps: { id: '', ops: [] } };
+        await S.B.setControl('d_' + d.id, patch);
+        S.control['d_' + d.id] = Object.assign({}, S.control['d_' + d.id], patch);
+        toast(t('pull_cancelled')); afterCtl();
+      } catch (e) { toast(t('failed'), 'bad'); }
+      break;
+    }
+    case 'vdata': openData(d.id); break;
+    case 'dvtab': if (S.dv) { S.dv.tab = d.k; S.dv.edit = null; renderDV(); } break;
+    case 'dvedit': if (S.dv) { S.dv.edit = { c: d.c, id: d.item }; renderDV(); } break;
+    case 'dvcancel': if (S.dv) { S.dv.edit = null; renderDV(); } break;
+    case 'dvsave': {
+      if (!S.dv) break;
+      const row = el.closest('.dvr'), v = dvCollect(d.c, row);
+      if (d.c !== 'notes' && !v.t) { toast(t('failed'), 'bad'); break; }
+      S.dv.edit = null;
+      try { await sendOps(S.dv.id, [{ c: d.c, a: 'set', id: +d.item, v }]); } catch (e) { console.error(e); toast(t('failed'), 'bad'); }
+      renderDV(); break;
+    }
+    case 'dvdel': case 'dvclear': case 'dvboard': {
+      if (!S.dv || !armed(el, t(a === 'dvdel' ? 'dv_del_confirm' : 'dv_clear_confirm'))) break;
+      const op = a === 'dvdel' ? { c: d.c, a: 'del', id: +d.item } : a === 'dvclear' ? { c: d.c, a: 'clear' } : { c: 'board', a: 'clear' };
+      try { await sendOps(S.dv.id, [op]); } catch (e) { console.error(e); toast(t('failed'), 'bad'); }
+      renderDV(); break;
+    }
+    case 'evdel': try { await S.B.deleteEvent(d.id); S.events = S.events.filter(e => e.id !== d.id); afterEv(); } catch (e) { console.error(e); toast(t('failed'), 'bad'); } break;
+    case 'evclear': modal({ title: t('f_clear_all'), hint: t('f_clear_hint'), ok: t('dv_del'), danger: true, onOk: async () => { const n = await S.B.clearEvents(); S.events = []; toast(t('done') + ' · ' + nf(n)); afterEv(); } }); break;
+    case 'evclearDev': {
+      if (!armed(el, t('dv_del_confirm'))) break;
+      try { const n = await S.B.clearEvents(d.id); S.events = S.events.filter(e => e.deviceId !== d.id); toast(t('done') + ' · ' + nf(n)); afterEv(); } catch (e) { console.error(e); toast(t('failed'), 'bad'); }
+      break;
+    }
+    case 'sdel': try { await S.B.deleteSession(d.id); S.sessions = S.sessions.filter(x => x.id !== d.id); toast(t('done')); if (S.page === 'sessions') renderTbl(); else renderPage(true); } catch (e) { console.error(e); toast(t('failed'), 'bad'); } break;
+    case 'sclear': modal({ title: t('s_clear_all'), hint: t('s_clear_hint'), ok: t('dv_del'), danger: true, onOk: async () => { const n = await S.B.clearSessions(); S.sessions = []; toast(t('done') + ' · ' + nf(n)); renderPage(true); } }); break;
+    case 'vclearall': askClearVisitors('0'); break;
     case 'morev': S.vShow += 50; renderTbl(); break;
     case 'mores': S.sShow += 50; renderTbl(); break;
     case 'csv': exportCsv(); break;
@@ -706,6 +864,7 @@ document.addEventListener('change', async e => {
   if (el.id === 'vf') { S.vf = el.value; S.vShow = 50; renderTbl(); }
   else if (el.id === 'vs') { S.vs = el.value; renderTbl(); }
   else if (el.id === 'limSel') { S.limit = +el.value; ls('nx.admin.limit', S.limit); watch(); toast(t('saved')); }
+  else if (el.id === 'offAllOn') { el.checked = !el.checked; askOfflineAll(); }
   else if (el.id === 'maintOn' || el.id === 'trackOn' || el.id === 'annOn') {
     const patch = el.id === 'maintOn' ? { maint: el.checked } : el.id === 'trackOn' ? { track: el.checked } : { annOn: el.checked, annId: String(Date.now()) };
     try { await S.B.setControl('config', patch); toast(t('saved')); } catch (x) { el.checked = !el.checked; toast(t('failed'), 'bad'); }
@@ -773,6 +932,8 @@ async function startApp() {
   S.B.counts().then(c => { S.counts = c; }).catch(() => {});
   clearInterval(liveTimer); clearInterval(visTimer);
   liveTimer = setInterval(() => { if (!document.hidden && LIVE_PAGES.includes(S.page)) renderPage(true); }, 20000);
+  clearInterval(S.pullTimer);
+  S.pullTimer = setInterval(() => { const el2 = $('#vpull'); if (!document.hidden && S.openId && el2 && pullPending(S.openId)) el2.innerHTML = pullBox(S.openId); }, 5000);
   visTimer = setInterval(() => { if (!document.hidden) S.B.counts().then(c => { S.counts = c; }).catch(() => {}); }, 120000);
 }
 
