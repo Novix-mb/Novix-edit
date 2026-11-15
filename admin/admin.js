@@ -39,6 +39,7 @@ const actLabel = k => { const v = t('act_' + k); return v === 'act_' + k ? k : v
 const devLabel = d => t(d === 'mobile' || d === 'tablet' || d === 'desktop' ? d : 'unknown');
 const COLORS = ['var(--acc)', 'var(--acc2)', 'var(--acc3)', 'var(--warn)', '#f78fb3', '#8d9b97'];
 
+const myName = () => { const me = ((S.user && S.user.email) || '').toLowerCase(), a = S.admins.find(x => x.email === me); return (a && a.name) || ls('nx.admin.myname') || (S.user && (S.user.displayName || S.user.email)) || ''; };
 const IC = {
   dash: '<rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/>',
   users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
@@ -88,7 +89,7 @@ const evIc = e => e.type === 'view' ? ['eye', '--acc2'] : e.type === 'open' ? ['
 const evRow = (e, who, del) => { const [i, c] = evIc(e); return `<div class="evr">${who ? avt(e.deviceId, null, 34) : ''}<span class="evic" style="--c:var(${c})">${ic(i)}</span><div><b>${who ? esc(vName(e.deviceId) || short(e.deviceId)) : ''}</b><span>${esc(evText(e))}</span></div><small>${ago(e.at)}</small>${del ? `<button class="ib evx" data-act="evdel" data-id="${esc(e.id)}" title="${esc(t('f_del'))}">${ic('trash')}</button>` : ''}</div>`; };
 function pFeed() {
   const list = S.events.slice(0, 120), devs = new Set(list.map(e => e.deviceId)).size;
-  return `<div class="card"><div class="tbar" style="justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">${ic('bolt')} ${t('f_title')}<small>${nf(list.length)}</small></h3>${list.length ? `<button class="btn sm bad" data-act="evclear">${ic('trash')}${t('f_clear_all')}</button>` : ''}</div>${list.length ? `<div class="sumrow"><span><b>${nf(devs)}</b> ${t('th_device')}</span><span>${t('th_last')}: <b>${ago(list[0].at)}</b></span></div><div class="evl">${list.map(e => evRow(e, true, true)).join('')}</div>` : emptyBox()}</div>`;
+  return `<div class="card"><div class="tbar" style="justify-content:space-between;margin-bottom:8px"><h3 style="margin:0">${ic('bolt')} ${t('f_title')}<small>${nf(list.length)}</small></h3></div>${list.length ? `<div class="sumrow"><span><b>${nf(devs)}</b> ${t('th_device')}</span><span>${t('th_last')}: <b>${ago(list[0].at)}</b></span></div><div class="evl">${list.map(e => evRow(e, true, true)).join('')}</div>` : emptyBox()}</div>`;
 }
 
 const S = {
@@ -231,7 +232,7 @@ function limitNote() { return S.sessions.length >= S.limit ? `<div class="note-l
 
 function hero(a) {
   const u = S.user || {}, h = new Date().getHours(), g = t(h < 5 ? 'g_night' : h < 12 ? 'g_morning' : h < 18 ? 'g_noon' : 'g_evening');
-  const nm = String(u.displayName || (u.email || '').split('@')[0] || '').split(' ')[0];
+  const nm = String(myName() || (u.email || '').split('@')[0] || '').split(' ')[0];
   const cfg = S.control.config || {}, today = S.sessions.filter(s => s.start >= cutoff('today')).length;
   const live = Array.from(a.onlineDev.values()).sort((x, y) => y.last - x.last).slice(0, 5);
   const flags = [cfg.maint ? `<span class="pill wr">${ic('wrench')}${t('hero_maint')}</span>` : '', cfg.annOn ? `<span class="pill in">${ic('mega')}${t('hero_ann')}</span>` : '', cfg.track === false ? `<span class="pill bd">${ic('alert')}${t('hero_notrack')}</span>` : ''].join('');
@@ -325,14 +326,11 @@ function visitorTable() {
   ${list.length > S.vShow ? `<div class="more"><button class="btn" data-act="morev">${t('a_load_more')} (${nf(list.length - S.vShow)})</button></div>` : ''}`;
 }
 function pVisitors() {
-  const opt = (v, k, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t(k)}</option>`, ob = !!(S.control.config || {}).offlineBlock;
+  const opt = (v, k, cur) => `<option value="${v}" ${cur === v ? 'selected' : ''}>${t(k)}</option>`;
   return `<div class="card"><div class="tbar">
     <div class="search">${ic('search')}<input id="vq" value="${esc(S.vq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div>
     <select class="inp" id="vs">${opt('last', 'sort_last', S.vs)}${opt('visits', 'sort_visits', S.vs)}${opt('time', 'sort_time', S.vs)}${opt('first', 'sort_first', S.vs)}</select>
-    <button class="btn pri" data-act="updall">${ic('bolt')}${t('a_updall')}</button><button class="btn" data-act="csv">${ic('download')}${t('a_export')}</button>
-    <details class="dd"><summary class="btn">${ic('dots')}${t('v_bulk')}</summary><div class="ddm">
-      <button class="btn ${ob ? 'bad on' : ''}" data-act="vofflineall">${ic(ob ? 'wifi' : 'wifi-off')}${t(ob ? 'a_offline_out_allow' : 'a_offline_out_block')}</button>
-      <button class="btn bad" data-act="vclear">${ic('trash')}${t('a_clear')}</button><button class="btn bad" data-act="vclearall">${ic('trash')}${t('v_clear_all')}</button></div></details></div>
+    <button class="btn" data-act="csv">${ic('download')}${t('a_export')}</button></div>
     <div id="tbl">${visitorTable()}</div></div>`;
 }
 
@@ -355,7 +353,7 @@ function sessionsBody() {
   return sum + sessionTable(list.slice(0, S.sShow)) + (list.length > S.sShow ? `<div class="more"><button class="btn" data-act="mores">${t('a_load_more')} (${nf(list.length - S.sShow)})</button></div>` : '') + limitNote();
 }
 function pSessions() {
-  return `<div class="card"><div class="tbar"><div class="search">${ic('search')}<input id="sq" value="${esc(S.sq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div><button class="btn bad" data-act="sclear">${ic('trash')}${t('s_clear_all')}</button></div><div id="tbl">${sessionsBody()}</div></div>`;
+  return `<div class="card"><div class="tbar"><div class="search">${ic('search')}<input id="sq" value="${esc(S.sq)}" placeholder="${esc(t('v_search'))}" autocomplete="off"></div></div><div id="tbl">${sessionsBody()}</div></div>`;
 }
 
 function pUsage() {
@@ -386,31 +384,40 @@ function pControls() {
     <div class="inl"><div class="fld"><label>${t('ctl_kind')}</label><select class="inp" name="kind" style="width:100%">${kinds}</select></div><button class="btn pri" type="submit">${ic('check')}${t('a_save')}</button></div></form></div>
   <div class="card"><div class="ctl-h" style="--c:var(--warn)"><span class="ic">${ic('wrench')}</span><div><b>${t('ctl_maint')}</b><small>${t('ctl_maint_sub')}</small></div><label class="sw"><input type="checkbox" id="maintOn" ${cfg.maint ? 'checked' : ''}><i></i></label></div>
     <form data-form="maint"><div class="fld"><label>${t('ctl_maint_msg')}</label><textarea class="inp" name="text" maxlength="240">${esc(cfg.maintMsg || '')}</textarea></div><button class="btn pri" type="submit">${ic('check')}${t('a_save')}</button></form></div></div>
-  <div class="grid g-3">
+  <div class="grid g-2e" style="align-items:start">
   <div class="card"><div class="ctl-h" style="--c:var(--acc2)"><span class="ic">${ic('pulse')}</span><div><b>${t('ctl_track')}</b><small>${t('ctl_track_sub')}</small></div><label class="sw"><input type="checkbox" id="trackOn" ${cfg.track === false ? '' : 'checked'}><i></i></label></div></div>
-  <div class="card"><div class="ctl-h" style="--c:var(--acc3)"><span class="ic">${ic('refresh')}</span><div><b>${t('ctl_upd')}</b><small>${t('ctl_upd_sub')}</small></div></div>
-    <button class="btn pri" data-act="updall">${ic('bolt')}${t('ctl_upd_all')}</button></div>
-  <div class="card"><div class="ctl-h" style="--c:var(--bad)"><span class="ic">${ic('wifi-off')}</span><div><b>${t('ctl_offline')}</b><small>${t('ctl_offline_sub')}</small></div><label class="sw"><input type="checkbox" id="offAllOn" ${cfg.offlineBlock ? 'checked' : ''}><i></i></label></div></div></div>
   <div class="grid g-2e">
   <div class="card"><h3>${ic('ban')} ${t('ctl_addban')}</h3><form data-form="banip"><div class="inl"><div class="fld"><label>${t('ctl_ip')}</label><input class="inp mono" name="ip" required maxlength="45" placeholder="41.34.12.9"></div>
     <div class="fld"><label>${t('b_dur')}</label><select class="inp" name="dur" style="width:100%"><option value="3600000">${t('b_1h')}</option><option value="86400000">${t('b_24h')}</option><option value="604800000">${t('b_7d')}</option><option value="0" selected>${t('b_forever')}</option></select></div></div>
-    <div class="fld" style="margin-top:12px"><label>${t('b_reason')}</label><input class="inp" name="reason" maxlength="120"></div><button class="btn bad" type="submit">${ic('ban')}${t('a_banip')}</button></form></div>
-  <div class="card"><h3>${ic('shield')} ${t('ctl_bans')}<small>${bans.length}</small></h3>${bans.length ? bans.map(([k, o]) => `<div class="banrow"><span class="ico pill bd">${ic('ban')}</span><div><b class="mono">${k.startsWith('d_') ? esc(short(k.slice(2))) + '…' : esc(o.value || k)}</b><small>${k.startsWith('d_') ? t('th_device') : t('th_ip')} · ${ms(o.until) ? t('ctl_until') + ' ' + dtm(ms(o.until)) : t('ctl_forever')}${o.reason ? ' · ' + esc(o.reason) : ''}</small></div><button class="btn sm" data-act="unban" data-key="${esc(k)}">${t('a_unban')}</button></div>`).join('') : `<div class="empty">${t('ctl_nobans')}</div>`}</div></div>`;
+    <div class="fld" style="margin-top:12px"><label>${t('b_reason')}</label><input class="inp" name="reason" maxlength="120"></div><button class="btn bad" type="submit">${ic('ban')}${t('a_banip')}</button></form></div></div>
+  <div class="card"><h3>${ic('shield')} ${t('ctl_bans')}<small>${bans.length}</small></h3>${bans.length ? bans.map(([k, o]) => `<div class="banrow"><span class="ico pill bd">${ic('ban')}</span><div><b class="mono">${k.startsWith('d_') ? esc(short(k.slice(2))) + '…' : esc(o.value || k)}</b><small>${k.startsWith('d_') ? t('th_device') : t('th_ip')} · ${ms(o.until) ? t('ctl_until') + ' ' + dtm(ms(o.until)) : t('ctl_forever')}${o.reason ? ' · ' + esc(o.reason) : ''}</small></div><button class="btn sm" data-act="unban" data-key="${esc(k)}">${t('a_unban')}</button></div>`).join('') : `<div class="empty">${t('ctl_nobans')}</div>`}</div>`;
 }
 
 function pTeam() {
   const me = (S.user.email || '').toLowerCase(), owner = (C.ownerEmail || '').toLowerCase();
-  return `<div class="grid g-2e"><div class="card"><h3>${ic('users')} ${t('nav_team')}<small>${S.admins.length}</small></h3>${S.admins.length ? S.admins.map(a => `<div class="banrow"><span class="ico pill in">${ic('users')}</span><div><b>${esc(a.email)}</b><small>${a.email === me ? t('t_you') : (a.email === owner ? t('t_owner') : (a.by ? esc(a.by) : ''))}${a.at ? ' · ' + dtm(a.at) : ''}</small></div>${a.email === me ? '' : `<button class="btn sm bad" data-act="admrm" data-email="${esc(a.email)}">${ic('trash')}${t('t_remove')}</button>`}</div>`).join('') : `<div class="empty">${t('t_none')}</div>`}</div>
+  return `<div class="grid g-2e"><div class="card"><h3>${ic('users')} ${t('nav_team')}<small>${S.admins.length}</small></h3>${S.admins.length ? S.admins.map(a => `<div class="banrow"><span class="ico pill in">${ic('users')}</span><div><b>${esc(a.name ? a.name + ' · ' : '')}${esc(a.email)}</b><small>${a.email === me ? t('t_you') : (a.email === owner ? t('t_owner') : (a.by ? esc(a.by) : ''))}${a.at ? ' · ' + dtm(a.at) : ''}</small></div>${a.email === me ? '' : `<button class="btn sm bad" data-act="admrm" data-email="${esc(a.email)}">${ic('trash')}${t('t_remove')}</button>`}</div>`).join('') : `<div class="empty">${t('t_none')}</div>`}</div>
   <div class="card"><h3>${ic('userplus')} ${t('t_add')}</h3><form data-form="adm"><div class="fld"><label>${t('t_email')}</label><input class="inp mono" type="email" name="email" required placeholder="friend@gmail.com"></div><button class="btn pri" type="submit">${ic('userplus')}${t('t_add')}</button></form><div class="hint-box">${t('t_hint')}</div></div></div>`;
 }
 
 function pSettings() {
   const lim = [300, 500, 1000, 2000].map(n => `<option value="${n}" ${S.limit === n ? 'selected' : ''}>${nf(n)}</option>`).join('');
   const days = [30, 60, 90, 180].map(n => `<option value="${n}">${t('set_days', { n })}</option>`).join('');
-  return `<div class="grid g-2e"><div class="card"><div class="fld"><label>${t('set_lang')}</label><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="ar" class="${lang === 'ar' ? 'on' : ''}">العربية</button><button data-act="lang" data-v="en" class="${lang === 'en' ? 'on' : ''}">English</button></div></div>
+  const ob = !!(S.control.config || {}).offlineBlock;
+  const row = (c, i, title, sub, btn) => `<div class="brow" style="--c:var(${c})"><span class="ic">${ic(i)}</span><div><b>${title}</b><small>${sub}</small></div>${btn}</div>`;
+  return `<div class="grid g-2e"><div class="card"><h3>${ic('users')} ${t('set_profile')}</h3>
+    <form data-form="myname"><div class="fld"><label>${t('set_name')}</label><input class="inp" name="name" maxlength="24" value="${esc(myName())}" placeholder="${esc(t('set_name_ph'))}" autocomplete="off"><small style="color:var(--muted)">${t('set_name_sub')}</small></div>
+    <button class="btn pri" type="submit">${ic('check')}${t('a_save')}</button></form></div>
+  <div class="card"><div class="fld"><label>${t('set_lang')}</label><div class="seg" style="align-self:flex-start"><button data-act="lang" data-v="ar" class="${lang === 'ar' ? 'on' : ''}">العربية</button><button data-act="lang" data-v="en" class="${lang === 'en' ? 'on' : ''}">English</button></div></div>
     <div class="fld"><label>${t('set_theme')}</label><div class="seg" style="align-self:flex-start"><button data-act="theme" data-v="dark" class="${theme === 'dark' ? 'on' : ''}">${t('theme_dark')}</button><button data-act="theme" data-v="light" class="${theme === 'light' ? 'on' : ''}">${t('theme_light')}</button></div></div>
     <div class="fld"><label>${t('set_limit')}</label><select class="inp" id="limSel" style="align-self:flex-start">${lim}</select><small style="color:var(--muted)">${t('set_limit_sub')}</small></div>
-    <div class="fld"><label>${t('set_proj')}</label><span class="mono">${esc(S.B.projectId)}</span>${S.demo ? `<span class="badge-demo" style="align-self:flex-start">${t('set_demo')}</span>` : ''}</div></div>
+    <div class="fld" style="margin-bottom:0"><label>${t('set_proj')}</label><span class="mono">${esc(S.B.projectId)}</span>${S.demo ? `<span class="badge-demo" style="align-self:flex-start">${t('set_demo')}</span>` : ''}</div></div></div>
+  <div class="grid g-2e"><div class="card"><h3>${ic('sliders')} ${t('set_bulk')}</h3><div class="sub">${t('set_bulk_sub')}</div>
+    ${row('--acc3', 'refresh', t('ctl_upd_all'), t('ctl_upd_sub'), `<button class="btn pri sm" data-act="updall">${ic('bolt')}${t('a_updall')}</button>`)}
+    ${row('--bad', ob ? 'wifi' : 'wifi-off', t('ctl_offline'), t(ob ? 'ctl_offline_on' : 'ctl_offline_off'), `<button class="btn sm ${ob ? 'bad on' : ''}" data-act="vofflineall">${t(ob ? 'a_offline_out_allow' : 'a_offline_out_block')}</button>`)}
+    ${row('--warn', 'clock', t('clr_title'), t('clr_hint'), `<button class="btn sm bad" data-act="vclear">${ic('trash')}${t('a_clear')}</button>`)}
+    ${row('--bad', 'users', t('v_clear_all'), t('set_all_hint'), `<button class="btn sm bad" data-act="vclearall">${ic('trash')}${t('dv_del')}</button>`)}
+    ${row('--bad', 'layers', t('s_clear_all'), t('s_clear_hint'), `<button class="btn sm bad" data-act="sclear">${ic('trash')}${t('dv_del')}</button>`)}
+    ${row('--bad', 'bolt', t('f_clear_all'), t('f_clear_hint'), `<button class="btn sm bad" data-act="evclear">${ic('trash')}${t('dv_del')}</button>`)}</div>
   <div class="card"><h3>${ic('trash')} ${t('set_clean')}</h3><div class="sub">${t('set_clean_sub')}</div><div class="inl"><div class="fld"><label>${t('set_clean_btn')}</label><select class="inp" id="cleanSel" style="width:100%">${days}</select></div><button class="btn bad" data-act="clean">${ic('trash')}${t('a_delete')}</button></div>
     <div style="margin-top:22px"><button class="btn" data-act="json">${ic('download')}${t('set_exp')}</button></div></div></div>`;
 }
@@ -421,11 +428,11 @@ const RANGED = ['overview', 'usage', 'sessions'];
 const LIVE_PAGES = ['overview', 'live', 'usage', 'feed'];
 
 function shell() {
-  const u = S.user, name = u.displayName || u.email || '';
+  const u = S.user, name = myName();
   const nav = NAV.map(([p, i], idx) => `${idx === 0 ? `<div class="nav-h">${t('sec_analytics')}</div>` : ''}${p === 'controls' ? `<div class="nav-h">${t('sec_manage')}</div>` : ''}<a data-act="nav" data-page="${p}" class="${S.page === p ? 'on' : ''}">${ic(i)}<span>${t('nav_' + p)}</span>${p === 'live' ? '<span class="cnt" id="liveCnt">0</span>' : ''}</a>`).join('');
   const bn = [['overview', 'dash'], ['live', 'pulse'], ['visitors', 'users'], ['controls', 'sliders']].map(([p, i]) => `<a data-act="nav" data-page="${p}" class="${S.page === p ? 'on' : ''}">${ic(i)}<span>${t('nav_' + p)}</span>${p === 'live' ? '<em class="cnt" id="liveCnt2">0</em>' : ''}</a>`).join('') + `<a data-act="menu">${ic('menu')}<span>${t('nav_more')}</span></a>`;
   root.innerHTML = `<div class="app"><aside class="side"><div class="brand"><img src="../assets/img/novix-icon-64.png" alt=""><div><b>NOVIX</b><small>${t('app')}</small></div></div><nav class="nav">${nav}</nav>
-    <div class="side-foot"><div class="me"><span class="av">${u.photoURL ? `<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" alt="">` : esc(name.slice(0, 1).toUpperCase())}</span><div><b>${esc(name)}</b><small>${esc(u.email || '')}</small></div></div><button class="btn" data-act="signout">${ic('logout')}${t('signout')}</button></div></aside>
+    <div class="side-foot"><div class="me" data-act="nav" data-page="settings" style="cursor:pointer"><span class="av">${u.photoURL ? `<img src="${esc(u.photoURL)}" referrerpolicy="no-referrer" alt="">` : esc(name.slice(0, 1).toUpperCase())}</span><div><b id="meName">${esc(name)}</b><small>${esc(u.email || '')}</small></div></div><button class="btn" data-act="signout">${ic('logout')}${t('signout')}</button></div></aside>
     <main class="main"><div class="top"><button class="ib menu-btn" data-act="menu">${ic('menu')}</button><div class="grow"><h1 id="ttl"></h1><p id="sub"></p></div><div class="tools" id="tools"></div></div><div id="err"></div><div id="page"></div></main><nav class="bnav">${bn}</nav></div>`;
   head(); renderPage(false);
 }
@@ -961,6 +968,13 @@ document.addEventListener('submit', async e => {
     if (k === 'ann') await S.B.setControl('config', { annText: String(fd.get('text')), annKind: String(fd.get('kind')), annId: String(Date.now()) });
     else if (k === 'maint') await S.B.setControl('config', { maintMsg: String(fd.get('text')) });
     else if (k === 'banip') { const ip = String(fd.get('ip')).trim(); if (!/^[0-9a-fA-F:.]{3,45}$/.test(ip)) return toast(t('failed'), 'bad'); await doBan(ipKey(ip), 'ip', ip, fd); f.reset(); return; }
+    else if (k === 'myname') {
+      const nm = String(fd.get('name') || '').trim().slice(0, 24), me = (S.user.email || '').toLowerCase();
+      ls('nx.admin.myname', nm);
+      try { await S.B.setAdminName(me, nm); } catch (x) { console.error(x); }
+      const a = S.admins.find(z => z.email === me); if (a) a.name = nm;
+      const el = $('#meName'); if (el) el.textContent = myName();
+    }
     else if (k === 'adm') { await S.B.addAdmin(String(fd.get('email')).trim(), S.user.email || ''); f.reset(); }
     toast(t('saved'));
   } catch (x) { console.error(x); toast(t('failed'), 'bad'); }

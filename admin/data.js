@@ -153,6 +153,7 @@ export async function createFirebaseBackend() {
       }
       return n;
     },
+    setAdminName: (email, name) => F.setDoc(F.doc(db, 'admins', email.toLowerCase()), { name }, { merge: true }),
     addAdmin: (email, by) => F.setDoc(F.doc(db, 'admins', email.toLowerCase()), { by, at: F.serverTimestamp() }),
     removeAdmin: email => F.deleteDoc(F.doc(db, 'admins', email.toLowerCase()))
   };
@@ -272,6 +273,7 @@ export function createDemoBackend() {
     async deleteVisitor(id) { let n = sessions.filter(x => x.deviceId === id).length; const i = visitors.findIndex(x => x.id === id); if (i >= 0) visitors.splice(i, 1); for (let k = sessions.length - 1; k >= 0; k--) if (sessions[k].deviceId === id) sessions.splice(k, 1); return n; },
     async cleanVisitors(ms, skip) { const sk = new Set(skip || []), cut = Date.now() - ms; const ids = visitors.filter(v => !sk.has(v.id) && (ms > 0 ? (v.last || 0) < cut : true)).map(v => v.id); for (const id of ids) await this.deleteVisitor(id); return ids; },
     cleanOld: async () => 0,
+    async setAdminName(email, name) { const a = admins.find(x => x.email === email); if (a) a.name = name; else admins.push({ email, name, by: '', at: Date.now() }); admCb && admCb(admins.slice()); },
     async addAdmin(email, by) { admins.push({ email: email.toLowerCase(), by, at: Date.now() }); admCb && admCb(admins.slice()); },
     async removeAdmin(email) { admins = admins.filter(a => a.email !== email); admCb && admCb(admins.slice()); }
   };
